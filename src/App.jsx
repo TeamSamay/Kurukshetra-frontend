@@ -15,7 +15,7 @@ import {
 import { AttackWebSocketManager } from './services/websocket';
 
 // ─── Toast Notification ───────────────────────────────────────────────────────
-function Toast({ msg, onClose }) {
+function Toast({ msg, title = 'SECURITY ALERT', onClose }) {
   useEffect(() => {
     const t = setTimeout(onClose, 6000);
     return () => clearTimeout(t);
@@ -23,14 +23,14 @@ function Toast({ msg, onClose }) {
 
   return (
     <div className="fixed top-4 right-4 z-[200] max-w-sm w-full slide-right">
-      <div className="card px-5 py-4 flex items-start gap-3"
-        style={{ background: '#0f1629', border: '1px solid rgba(244,63,94,0.4)', boxShadow: '0 0 30px rgba(244,63,94,0.2)' }}>
-        <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 blink" style={{ background: '#fb7185' }} />
+      <div className="card px-4 py-3 flex items-start gap-3 border border-rose-500/50 shadow-2xl rounded-xl"
+        style={{ background: '#0b1120', boxShadow: '0 0 25px rgba(244,63,94,0.35)' }}>
+        <div className="w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0 bg-rose-500 blink" />
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-bold text-white">ALERT</p>
-          <p className="text-xs mt-0.5 break-all" style={{ color: '#94a3b8' }}>{msg}</p>
+          <p className="text-[11px] font-black text-rose-400 tracking-wider font-mono">{title}</p>
+          <p className="text-xs mt-0.5 text-slate-200 font-mono break-all leading-snug">{msg}</p>
         </div>
-        <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors flex-shrink-0 text-lg leading-none">✕</button>
+        <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors flex-shrink-0 text-sm font-bold">✕</button>
       </div>
     </div>
   );
@@ -50,10 +50,27 @@ export default function App() {
   const [toasts, setToasts]             = useState([]);
   const [loading, setLoading]           = useState(true);
 
+  const selectedIdRef = React.useRef(selectedId);
+  selectedIdRef.current = selectedId;
+
   // ── Toast helpers ─────────────────────────────────────────────────────────
-  const addToast = useCallback((msg) => {
+  const addToast = useCallback((msg, title = 'SECURITY ALERT') => {
     const id = Date.now();
-    setToasts(prev => [...prev.slice(-2), { id, msg }]);
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.2);
+    } catch {}
+    setToasts(prev => [...prev.slice(-3), { id, msg, title }]);
   }, []);
 
   const removeToast = useCallback((id) => {
@@ -62,7 +79,6 @@ export default function App() {
 
   // ── Data loading ──────────────────────────────────────────────────────────
   const loadAll = useCallback(async () => {
-    setLoading(true);
     try {
       const [sum, atks, iocs, atkrs, mitre] = await Promise.allSettled([
         fetchDashboardSummary(),
@@ -102,24 +118,18 @@ export default function App() {
   // Load session when selected
   useEffect(() => { if (selectedId) loadSession(selectedId); }, [selectedId, loadSession]);
 
-  // Auto-refresh every 30s
+  // Fast background auto-refresh every 5s for guaranteed sync
   useEffect(() => {
-    const t = setInterval(loadAll, 30000);
+    const t = setInterval(loadAll, 5000);
     return () => clearInterval(t);
   }, [loadAll]);
 
-  // ── WebSocket ─────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const ws = new AttackWebSocketManager(null, handleWsMsg, (ok) => setWsConnected(ok));
-    ws.connect();
-    return () => ws.disconnect();
-  }, [selectedId]); // eslint-disable-line
-
-  function handleWsMsg(data) {
+  // ── WebSocket Handler ─────────────────────────────────────────────────────
+  const handleWsMsgRef = React.useRef();
+  handleWsMsgRef.current = (data) => {
     if (!data) return;
 
     if (data.type === 'POLL_TICK') {
-      // Polling fallback: refresh all data
       loadAll();
       return;
     }
@@ -163,7 +173,8 @@ export default function App() {
         });
 
         // C. Update Active Investigation View if open
-        if (selectedId === sessionId) {
+        const curSelectedId = selectedIdRef.current;
+        if (curSelectedId === sessionId) {
           setSession(prev => {
             if (!prev) return prev;
             const updatedEvents = prev.events ? [...prev.events, eventObj] : [eventObj];
@@ -191,11 +202,11 @@ export default function App() {
           setMitreData(prev => [...newMitre, ...prev]);
         }
 
-        // F. Trigger Instant Alert Toast
+        // F. Trigger Instant Alert Toast & Sound
         const sourceIp = eventObj.source_ip || sessionDoc.source_ip || 'Unknown Attacker';
         const svc = (eventObj.service || sessionDoc.service || 'HONEYPOT').toUpperCase();
         const action = eventObj.event || eventObj.event_type || 'Interaction detected';
-        addToast(`🔴 [${svc}] ${sourceIp}: ${action.slice(0, 45)}`);
+        addToast(`${sourceIp} → ${action.slice(0, 50)}`, `🚨 LIVE ${svc} ATTACK`);
       }
     }
 
@@ -204,13 +215,23 @@ export default function App() {
       const id = data.data?.session_id || data.session_id;
       if (id) {
         setAttacks(prev => prev.map(a => (a.session_id === id ? { ...a, status: 'CONTAINED' } : a)));
-        if (selectedId === id) {
+        if (selectedIdRef.current === id) {
           setSession(p => (p ? { ...p, status: 'CONTAINED' } : p));
         }
-        addToast(`🛡️ Session ${id.slice(0, 12)}… isolated and contained`);
+        addToast(`Session ${id.slice(0, 12)}… isolated and contained`, '🛡️ CONTAINMENT ACTION');
       }
     }
-  }
+  };
+
+  // Connect WebSocket ONCE on mount
+  useEffect(() => {
+    const ws = new AttackWebSocketManager(null, (data) => {
+      if (handleWsMsgRef.current) handleWsMsgRef.current(data);
+    }, (ok) => setWsConnected(ok));
+
+    ws.connect();
+    return () => ws.disconnect();
+  }, []);
 
   // ── Actions ────────────────────────────────────────────────────────────────
   function handleSelectAttack(id) {
@@ -248,7 +269,7 @@ export default function App() {
       <div className="fixed top-4 right-4 z-[200] space-y-2 pointer-events-none">
         {toasts.map(t => (
           <div key={t.id} className="pointer-events-auto">
-            <Toast msg={t.msg} onClose={() => removeToast(t.id)} />
+            <Toast msg={t.msg} title={t.title} onClose={() => removeToast(t.id)} />
           </div>
         ))}
       </div>

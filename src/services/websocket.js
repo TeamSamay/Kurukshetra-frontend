@@ -27,18 +27,21 @@ export class AttackWebSocketManager {
     this._retries   = 0;
     this._backoffMs = 2000;
     this._pollTimer = null;
+    this._pingTimer = null;
     this._polling   = false;
   }
 
   connect() {
     if (this._stopped) return;
     try {
-      this.ws = new WebSocket(WS_ENDPOINT);
+      const endpoint = getWsEndpoint();
+      this.ws = new WebSocket(endpoint);
 
       this.ws.onopen = () => {
         this._retries   = 0;
         this._backoffMs = 2000;
         this._stopPolling();
+        this._startPing();
         this._polling = false;
         if (this.onStatus) this.onStatus(true, 'CONNECTED');
       };
@@ -57,31 +60,44 @@ export class AttackWebSocketManager {
       };
 
       this.ws.onclose = () => {
+        this._stopPing();
         if (this.onStatus) this.onStatus(false, 'DISCONNECTED');
         this._scheduleReconnect();
       };
     } catch (e) {
+      this._stopPing();
       if (this.onStatus) this.onStatus(false, 'FAILED');
       this._scheduleReconnect();
+    }
+  }
+
+  _startPing() {
+    this._stopPing();
+    // Send keepalive ping every 15s to prevent Render cloud proxy timeout
+    this._pingTimer = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        try {
+          this.ws.send(JSON.stringify({ type: 'PING' }));
+        } catch {}
+      }
+    }, 15000);
+  }
+
+  _stopPing() {
+    if (this._pingTimer) {
+      clearInterval(this._pingTimer);
+      this._pingTimer = null;
     }
   }
 
   _scheduleReconnect() {
     if (this._stopped) return;
     this._retries++;
-    if (this._retries >= MAX_RETRIES_BEFORE_POLL && !this._polling) {
-      // Fall back: poll tick so App can refresh data manually
-      console.warn('[WS] Falling back to poll ticks');
-      this._polling = true;
-      if (this.onStatus) this.onStatus(false, 'POLLING');
-      this._pollTimer = setInterval(() => {
-        if (this.onMessage) this.onMessage({ type: 'POLL_TICK' });
-      }, POLL_INTERVAL_MS);
-    } else if (!this._polling) {
-      const delay = Math.min(this._backoffMs, 30000);
-      this._backoffMs = Math.min(this._backoffMs * 1.5, 30000);
-      setTimeout(() => this.connect(), delay);
-    }
+    const delay = Math.min(this._backoffMs, 8000);
+    this._backoffMs = Math.min(this._backoffMs * 1.3, 8000);
+    setTimeout(() => {
+      if (!this._stopped) this.connect();
+    }, delay);
   }
 
   _stopPolling() {
@@ -93,7 +109,11 @@ export class AttackWebSocketManager {
 
   disconnect() {
     this._stopped = true;
+    this._stopPing();
     this._stopPolling();
-    if (this.ws) { this.ws.close(); this.ws = null; }
+    if (this.ws) {
+      try { this.ws.close(); } catch {}
+      this.ws = null;
+    }
   }
 }
