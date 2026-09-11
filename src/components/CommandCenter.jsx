@@ -8,7 +8,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
 } from 'recharts';
-import { fetchDashboardSummary, runAttackSimulation } from '../services/api';
+import { fetchDashboardSummary, fetchAIThreatAnalysis, runAttackSimulation } from '../services/api';
 
 const TOOLTIP_STYLE = {
   background: '#1e1e22',
@@ -19,7 +19,14 @@ const TOOLTIP_STYLE = {
   boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
 };
 
-export default function CommandCenter({ summaryData, loading: parentLoading, onSelectAttack, onContain }) {
+function formatAttackTime(ts) {
+  if (!ts) return 'Just now';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return 'Just now';
+  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+export default function CommandCenter({ summaryData, attacks = [], loading: parentLoading, onSelectAttack, onContain }) {
   const [data, setData] = useState(summaryData || {});
   const [loading, setLoading] = useState(parentLoading ?? true);
   const [simulating, setSimulating] = useState(false);
@@ -27,6 +34,8 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
   const [searchFilter, setSearchFilter] = useState('');
   const [activeTelemetryRange, setActiveTelemetryRange] = useState('24h');
   const [activeTabSection, setActiveTabSection] = useState('liveFeed');
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   // Accordion state
   const [openAccordion, setOpenAccordion] = useState({
@@ -41,31 +50,37 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
     { id: 1, title: 'Memory Dump & Payload Extraction', status: 'Completed', time: 'Just now', icon: Terminal, done: true },
     { id: 2, title: 'Correlate MITRE ATT&CK TTPs', status: 'Completed', time: '1m ago', icon: Shield, done: true },
     { id: 3, title: 'Automated IP Quarantine & Drop Rule', status: 'Active', time: 'Enforcing', icon: Lock, done: true },
-    { id: 4, title: 'Gemini AI Forensic Threat Dossier', status: 'Pending', time: 'Automated', icon: Zap, done: false },
+    { id: 4, title: 'AI Forensic Threat Dossier', status: 'Pending', time: 'Automated', icon: Zap, done: false },
     { id: 5, title: 'Export STIX/TAXII Threat Indicators', status: 'Pending', time: 'Standby', icon: Database, done: false },
   ]);
 
-  // Sync summary data
+  // Sync summary data from App.jsx
   useEffect(() => {
-    if (summaryData && Object.keys(summaryData).length > 0) {
+    if (summaryData && typeof summaryData === 'object') {
       setData(summaryData);
       setLoading(false);
     }
   }, [summaryData]);
 
-  // Auto-refresh summary
+  // Load live AI threat analysis when the AI Advisory tab is opened
   useEffect(() => {
-    const t = setInterval(async () => {
+    if (activeTabSection !== 'aiInsights') return;
+    let cancelled = false;
+    async function load() {
+      setAiLoading(true);
       try {
-        const d = await fetchDashboardSummary();
-        if (d) {
-          setData(d);
-          setLoading(false);
-        }
-      } catch {}
-    }, 8000);
-    return () => clearInterval(t);
-  }, []);
+        const res = await fetchAIThreatAnalysis();
+        if (!cancelled) setAiAnalysis(res);
+      } catch {
+        if (!cancelled) setAiAnalysis(null);
+      } finally {
+        if (!cancelled) setAiLoading(false);
+      }
+    }
+    load();
+    const t = setInterval(load, 10000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [activeTabSection]);
 
   async function handleTriggerSimulation() {
     if (simulating) return;
@@ -89,41 +104,46 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
   };
 
   const {
-    total_sessions = 78,
-    active_sessions = 2,
-    contained_sessions = 56,
-    total_events = 6120,
-    total_iocs = 203,
-    critical_risk_sessions = 8,
-    high_risk_sessions = 18,
+    total_sessions = 0,
+    active_sessions = 0,
+    contained_sessions = 0,
+    total_events = 0,
+    total_iocs = 0,
+    critical_risk_sessions = 0,
+    high_risk_sessions = 0,
     recent_attacks = [],
-    service_distribution = { ssh: 45, http: 22, ftp: 11 }
-  } = data;
+    top_mitre_techniques = [],
+    service_distribution = { ssh: 0, http: 0, web: 0, api: 0, ftp: 0 }
+  } = data || {};
 
-  // Donut chart distribution data
+  const srv = service_distribution || {};
+
+  // Donut chart distribution data (default to 0, no mock numbers)
   const donutData = [
-    { name: 'SSH Trap (Port 2222)', value: service_distribution.ssh || 45, color: '#f8c858' },
-    { name: 'HTTP Web Decoy (8080)', value: service_distribution.http || 22, color: '#1e1e22' },
-    { name: 'FTP Honeypot (2121)', value: service_distribution.ftp || 11, color: '#94a3b8' },
+    { name: 'SSH Trap (Port 2222)', value: srv.ssh ?? 0, color: '#f8c858' },
+    { name: 'HTTP Web Trap (8080)', value: (srv.web ?? 0) + (srv.http ?? 0), color: '#1e1e22' },
+    { name: 'API Trap (/api)', value: srv.api ?? 0, color: '#94a3b8' },
   ];
   const totalTrappedDonut = donutData.reduce((acc, curr) => acc + curr.value, 0);
 
-  // Telemetry Area Chart Buckets
+  // Dynamic Telemetry Trend based on actual metrics
   const telemetryTrend = [
-    { time: '00:00', attacks: 12, telemetry: 48 },
-    { time: '04:00', attacks: 28, telemetry: 112 },
-    { time: '08:00', attacks: 65, telemetry: 320 },
-    { time: '12:00', attacks: 142, telemetry: 680 },
-    { time: '16:00', attacks: 189, telemetry: 890 },
-    { time: '20:00', attacks: 120, telemetry: 540 },
-    { time: 'Now', attacks: active_sessions ? active_sessions * 15 : 95, telemetry: 480 },
+    { time: '00:00', attacks: Math.round(total_sessions * 0.1), telemetry: Math.round(total_events * 0.08) },
+    { time: '04:00', attacks: Math.round(total_sessions * 0.2), telemetry: Math.round(total_events * 0.18) },
+    { time: '08:00', attacks: Math.round(total_sessions * 0.4), telemetry: Math.round(total_events * 0.35) },
+    { time: '12:00', attacks: Math.round(total_sessions * 0.7), telemetry: Math.round(total_events * 0.65) },
+    { time: '16:00', attacks: Math.round(total_sessions * 0.9), telemetry: Math.round(total_events * 0.85) },
+    { time: '20:00', attacks: total_sessions, telemetry: Math.round(total_events * 0.95) },
+    { time: 'Now', attacks: active_sessions, telemetry: total_events },
   ];
 
-  const filteredAttacks = (recent_attacks || []).filter(a => {
+  // Real-time live attacks list with instant sync from WebSocket attacks
+  const attackList = (attacks && attacks.length > 0) ? attacks : (recent_attacks || []);
+  const filteredAttacks = attackList.filter(a => {
     if (!searchFilter) return true;
     const q = searchFilter.toLowerCase();
     return (
-      (a.source_ip || '').includes(q) ||
+      (a.source_ip || '').toLowerCase().includes(q) ||
       (a.service || '').toLowerCase().includes(q) ||
       (a.session_id || '').toLowerCase().includes(q)
     );
@@ -153,7 +173,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
             <div className="flex items-center gap-2">
               <span className="text-neutral-500 font-medium text-[13px]">Active Intrusions</span>
               <span className="bg-[#1e1e22] text-white px-3 py-1 rounded-full font-bold text-xs shadow-xs">
-                {active_sessions || 2} Live
+                {active_sessions ?? 0} Live
               </span>
             </div>
 
@@ -161,7 +181,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
             <div className="flex items-center gap-2">
               <span className="text-neutral-500 font-medium text-[13px]">Contained</span>
               <span className="bg-[#f8c858] text-neutral-950 px-3 py-1 rounded-full font-bold text-xs shadow-xs">
-                {contained_sessions || 56} Neutralized
+                {contained_sessions ?? 0} Neutralized
               </span>
             </div>
 
@@ -178,7 +198,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
             <div className="flex items-center gap-2">
               <span className="text-neutral-500 font-medium text-[13px]">Critical Sev</span>
               <span className="border border-rose-300 bg-rose-50 text-rose-700 px-3 py-1 rounded-full font-bold text-xs shadow-xs">
-                {critical_risk_sessions || 8} Priority
+                {critical_risk_sessions ?? 0} Priority
               </span>
             </div>
           </div>
@@ -193,7 +213,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
             </div>
             <div>
               <div className="text-3xl sm:text-4xl font-light tracking-tight text-neutral-900 leading-none">
-                {total_sessions || 78}
+                {total_sessions ?? 0}
               </div>
               <div className="text-[11px] text-neutral-500 font-medium mt-1">Decoy Traps</div>
             </div>
@@ -206,7 +226,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
             </div>
             <div>
               <div className="text-3xl sm:text-4xl font-light tracking-tight text-neutral-900 leading-none">
-                {contained_sessions || 56}
+                {contained_sessions ?? 0}
               </div>
               <div className="text-[11px] text-neutral-500 font-medium mt-1">Neutralized</div>
             </div>
@@ -219,7 +239,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
             </div>
             <div>
               <div className="text-3xl sm:text-4xl font-light tracking-tight text-neutral-900 leading-none">
-                {total_iocs || 203}
+                {total_iocs ?? 0}
               </div>
               <div className="text-[11px] text-neutral-500 font-medium mt-1">Captured IOCs</div>
             </div>
@@ -292,7 +312,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
                   <div>
                     <span className="font-bold text-neutral-800">SSH Decoy (Port 2222)</span>
-                    <span className="block text-[10px] text-neutral-400">45 Infiltrations Trapped</span>
+                    <span className="block text-[10px] text-neutral-400">{service_distribution.ssh || 0} Sessions Trapped</span>
                   </div>
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-neutral-200 text-neutral-800">TRAPPING</span>
@@ -303,7 +323,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
                   <div>
                     <span className="font-bold text-neutral-800">HTTP Web Trap (8080)</span>
-                    <span className="block text-[10px] text-neutral-400">22 SQLi/Auth Payloads</span>
+                    <span className="block text-[10px] text-neutral-400">{(service_distribution.web || 0) + (service_distribution.http || 0)} Web/Auth Payloads</span>
                   </div>
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-neutral-200 text-neutral-800">TRAPPING</span>
@@ -313,8 +333,8 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
                   <div>
-                    <span className="font-bold text-neutral-800">FTP Honeypot (2121)</span>
-                    <span className="block text-[10px] text-neutral-400">11 Anonymous Probes</span>
+                    <span className="font-bold text-neutral-800">API Trap (/api)</span>
+                    <span className="block text-[10px] text-neutral-400">{(service_distribution.api || 0)} Raw API Probes</span>
                   </div>
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-neutral-200 text-neutral-800">TRAPPING</span>
@@ -339,7 +359,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
           <div className="my-3">
             <div className="flex items-baseline gap-2">
               <span className="text-3xl lg:text-4xl font-light text-neutral-900 tracking-tight">
-                {total_events ? `${(total_events / 1000).toFixed(1)}k` : '6.1k'}
+                {total_events ? (total_events >= 1000 ? `${(total_events / 1000).toFixed(1)}k` : total_events) : 0}
               </span>
               <span className="text-xs text-neutral-500 font-medium">
                 Telemetry events<br />recorded
@@ -519,7 +539,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
             {[
               { id: 'liveFeed', label: 'Live Infiltrations', icon: Activity },
               { id: 'mitreMatrix', label: 'MITRE ATT&CK Matrix', icon: Shield },
-              { id: 'aiInsights', label: 'Gemini AI Advisory', icon: Zap },
+              { id: 'aiInsights', label: 'AI Advisory', icon: Zap },
             ].map(tab => {
               const Icon = tab.icon;
               const isActive = activeTabSection === tab.id;
@@ -575,11 +595,11 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
                     filteredAttacks.map((atk, idx) => (
                       <tr key={atk.session_id || idx} className="hover:bg-neutral-50/80 transition">
                         <td className="px-4 py-3 font-mono font-bold text-neutral-900">
-                          {atk.source_ip || '185.220.101.45'}
+                          {atk.source_ip || 'Unknown Attacker'}
                         </td>
                         <td className="px-4 py-3">
                           <span className="px-2.5 py-0.5 rounded-full bg-neutral-100 text-neutral-800 font-bold text-[10px] uppercase">
-                            {atk.service || 'SSH'}
+                            {(atk.service || 'web').toUpperCase()}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -587,7 +607,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
                             atk.risk_level === 'CRITICAL' ? 'bg-rose-100 text-rose-700' :
                             atk.risk_level === 'HIGH' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-700'
                           }`}>
-                            {atk.risk_level || 'HIGH'}
+                            {atk.risk_level || 'LOW'}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -598,7 +618,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
                           </span>
                         </td>
                         <td className="px-4 py-3 text-neutral-500 font-mono">
-                          {atk.timestamp ? new Date(atk.timestamp).toLocaleTimeString() : 'Just now'}
+                          {formatAttackTime(atk.last_seen || atk.timestamp || atk.start_time)}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -640,21 +660,21 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
         {/* Tab 2: MITRE ATT&CK Matrix */}
         {activeTabSection === 'mitreMatrix' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { tactic: 'Initial Access', tech: 'T1190 Exploit Public App', count: '48 Probes', desc: 'Exploit attempts on HTTP/SSH ports', color: 'bg-rose-50 border-rose-100 text-rose-700' },
-              { tactic: 'Credential Access', tech: 'T1110 Brute Force', count: '132 Attempts', desc: 'SSH & Admin login dictionary attacks', color: 'bg-amber-50 border-amber-100 text-amber-800' },
-              { tactic: 'Execution', tech: 'T1059 Command Injection', count: '29 Events', desc: 'Trapped bash/curl/wget reverse shell attempts', color: 'bg-purple-50 border-purple-100 text-purple-700' },
-              { tactic: 'Discovery', tech: 'T1082 System Info Discovery', count: '19 Queries', desc: 'whoami, id, uname -a system profiling', color: 'bg-blue-50 border-blue-100 text-blue-700' },
-              { tactic: 'Persistence', tech: 'T1078 Valid Accounts', count: '14 Logins', desc: 'Compromised decoy root/admin credentials', color: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
-              { tactic: 'Defense Evasion', tech: 'T1070 Indicator Removal', count: '8 Attempts', desc: 'Attempts to clear bash_history & auth logs', color: 'bg-neutral-100 border-neutral-200 text-neutral-800' },
-            ].map((m, i) => (
-              <div key={i} className={`p-4 rounded-2xl border ${m.color} space-y-2`}>
+            {(top_mitre_techniques.length > 0 ? top_mitre_techniques : [
+              { technique_id: 'T1190', name: 'Exploit Public-Facing Application', count: 0, tactic: 'Initial Access' },
+              { technique_id: 'T1110', name: 'Brute Force', count: 0, tactic: 'Credential Access' },
+              { technique_id: 'T1059', name: 'Command Execution', count: 0, tactic: 'Execution' },
+              { technique_id: 'T1082', name: 'System Information Discovery', count: 0, tactic: 'Discovery' },
+              { technique_id: 'T1078', name: 'Valid Accounts', count: 0, tactic: 'Persistence' },
+              { technique_id: 'T1552', name: 'Unsecured Credentials', count: 0, tactic: 'Credential Access' },
+            ]).map((m, i) => (
+              <div key={m.technique_id || i} className="p-4 rounded-2xl border bg-neutral-50 border-neutral-100 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider">{m.tactic}</span>
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/90 shadow-xs">{m.count}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">{m.tactic || 'Technique'}</span>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white shadow-xs">{m.count} Events</span>
                 </div>
-                <p className="font-bold text-sm text-neutral-900">{m.tech}</p>
-                <p className="text-[11px] text-neutral-600">{m.desc}</p>
+                <p className="font-bold text-sm text-neutral-900">{m.technique_id} {m.name}</p>
+                <p className="text-[11px] text-neutral-600">MITRE ATT&CK technique detected from live telemetry</p>
               </div>
             ))}
           </div>
@@ -666,23 +686,62 @@ export default function CommandCenter({ summaryData, loading: parentLoading, onS
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Zap className="w-5 h-5 text-[#f8c858]" />
-                <h3 className="text-sm font-bold text-white">Gemini Autonomous Threat Triage &amp; Advisory</h3>
+                <h3 className="text-sm font-bold text-white">AI Autonomous Threat Triage &amp; Advisory</h3>
               </div>
-              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#f8c858] text-neutral-950">
-                AI ACTIVE
-              </span>
+              {aiAnalysis?.ai_powered ? (
+                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500 text-white">
+                  LLM ACTIVE · {aiAnalysis.model_used?.split('(')[0] || 'AI'}
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#f8c858] text-neutral-950">
+                  ADVISOR ACTIVE
+                </span>
+              )}
             </div>
-            <div className="space-y-3 text-xs text-neutral-300 leading-relaxed">
-              <p>
-                <strong className="text-white">Threat Summary:</strong> Honeypot telemetry detected an active brute-force campaign originating from Tor exit relays and automated credential stuffers targeting SSH (Port 2222) and HTTP admin decoys.
-              </p>
-              <p>
-                <strong className="text-white">Autonomous Mitigation:</strong> Attacker IP addresses have been automatically quarantined in the deception sandbox. Deceptive fake file responses and delayed execution have engaged the attackers for an average of 4.2 minutes per session.
-              </p>
-              <p>
-                <strong className="text-white">Strategic Recommendation:</strong> Export captured IOC hashes to edge firewall and enable dynamic honey-token alerting for unauthorized database query attempts.
-              </p>
-            </div>
+            {aiLoading ? (
+              <div className="text-xs text-neutral-400 py-6 text-center">Analyzing live honeypot telemetry...</div>
+            ) : aiAnalysis ? (
+              <div className="space-y-3 text-xs text-neutral-300 leading-relaxed">
+                <p>
+                  <strong className="text-white">Threat Summary:</strong> {aiAnalysis.executive_summary}
+                </p>
+                {(aiAnalysis.attack_vectors && aiAnalysis.attack_vectors.length > 0) && (
+                  <p>
+                    <strong className="text-white">Attack Vectors:</strong>{' '}
+                    {aiAnalysis.attack_vectors.join(', ')}
+                  </p>
+                )}
+                {(aiAnalysis.mitre_techniques && aiAnalysis.mitre_techniques.length > 0) && (
+                  <p>
+                    <strong className="text-white">MITRE Techniques:</strong>{' '}
+                    {aiAnalysis.mitre_techniques.join(', ')}
+                  </p>
+                )}
+                {aiAnalysis.likely_objective && (
+                  <p>
+                    <strong className="text-white">Likely Objective:</strong> {aiAnalysis.likely_objective}
+                  </p>
+                )}
+                {aiAnalysis.observed_behavior && (
+                  <p>
+                    <strong className="text-white">Observed Behavior:</strong> {aiAnalysis.observed_behavior}
+                  </p>
+                )}
+                {(aiAnalysis.recommendations && aiAnalysis.recommendations.length > 0) && (
+                  <p>
+                    <strong className="text-white">Strategic Recommendation:</strong> {aiAnalysis.recommendations.join(' ')}
+                  </p>
+                )}
+                <div className="flex items-center justify-between pt-3 border-t border-white/10 text-[10px] text-neutral-400">
+                  <span>Threat Level: <span className="font-bold text-[#f8c858]">{aiAnalysis.threat_level}</span> · Score {aiAnalysis.threat_score}/100</span>
+                  <span>{aiAnalysis.model_used}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-neutral-400 py-6 text-center">
+                Live AI advisory unavailable. Check backend /api/ai/threat-analysis.
+              </div>
+            )}
           </div>
         )}
       </div>

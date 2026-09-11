@@ -56,6 +56,10 @@ export const fetchMitre = (sessionId) =>
 // ─── Reports ─────────────────────────────────────────────────────────────────
 export const fetchReport = (sessionId) => apiFetch(`/api/reports/${sessionId}`);
 
+// ─── AI Threat Landscape (live analysis for AI Advisory tab) ────────────────
+export const fetchAIThreatAnalysis = (limit = 40) =>
+  apiFetch(`/api/ai/threat-analysis?limit=${limit}`);
+
 // ─── One-Click Simulator ─────────────────────────────────────────────────────
 // Sends a full multi-stage attack campaign to the live backend (schema-compliant).
 const SIM_IPS = [

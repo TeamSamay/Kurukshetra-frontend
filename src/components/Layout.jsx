@@ -25,7 +25,7 @@ export default function Layout({
   const [simulating, setSimulating] = useState(false);
   const [simMsg, setSimMsg] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [notifications, setNotifications] = useState(3);
+  const [notifications, setNotifications] = useState(0);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   async function handleSimulate() {

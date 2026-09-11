@@ -84,8 +84,28 @@ export default function App() {
         fetchAttackers(),
         fetchMitre(),
       ]);
-      if (sum.status     === 'fulfilled' && sum.value)     setSummaryData(sum.value);
-      if (atks.status    === 'fulfilled' && atks.value)    setAttacks(atks.value);
+      if (sum.status     === 'fulfilled' && sum.value) {
+        setSummaryData(prev => ({
+          ...sum.value,
+          total_events: Math.max(sum.value.total_events ?? 0, prev.total_events ?? 0),
+          total_sessions: Math.max(sum.value.total_sessions ?? 0, prev.total_sessions ?? 0),
+          total_iocs: Math.max(sum.value.total_iocs ?? 0, prev.total_iocs ?? 0),
+          recent_attacks: (prev.recent_attacks && prev.recent_attacks.length > 0)
+            ? [
+                ...prev.recent_attacks.slice(0, 3),
+                ...(sum.value.recent_attacks || []).filter(sa => !prev.recent_attacks.slice(0, 3).some(pa => pa.session_id === sa.session_id))
+              ].slice(0, 20)
+            : (sum.value.recent_attacks || []),
+        }));
+      }
+      if (atks.status    === 'fulfilled' && atks.value) {
+        setAttacks(prev => {
+          if (!prev || prev.length === 0) return atks.value;
+          const recentTop = prev.slice(0, 3);
+          const remaining = atks.value.filter(a => !recentTop.some(r => r.session_id === a.session_id));
+          return [...recentTop, ...remaining];
+        });
+      }
       if (iocs.status    === 'fulfilled' && iocs.value)    setIocList(iocs.value);
       if (atkrs.status   === 'fulfilled' && atkrs.value)   setAttackers(atkrs.value);
       if (mitre.status   === 'fulfilled' && mitre.value)   setMitreData(mitre.value);
@@ -142,30 +162,49 @@ export default function App() {
       const sessionId = sessionDoc.session_id || eventObj.session_id;
 
       if (sessionId) {
-        // A. Update Attacks List
+        const nowIso = eventObj.timestamp || sessionDoc.last_seen || new Date().toISOString();
+        const normalizedSession = {
+          ...sessionDoc,
+          session_id: sessionId,
+          timestamp: nowIso,
+          last_seen: nowIso,
+          source_ip: sessionDoc.source_ip || eventObj.source_ip || 'Unknown Attacker',
+          service: sessionDoc.service || eventObj.service || 'web',
+          status: sessionDoc.status || 'ACTIVE',
+          risk_level: sessionDoc.risk_level || 'HIGH',
+          event: eventObj.event || eventObj.event_type || 'Interaction detected',
+        };
+
+        // A. Update Attacks List: Always move the active/updated attack to the very TOP (index 0)
         setAttacks(prev => {
-          const exists = prev.some(a => a.session_id === sessionId);
-          if (exists) {
-            return prev.map(a => (a.session_id === sessionId ? { ...a, ...sessionDoc } : a));
-          }
-          return [sessionDoc, ...prev];
+          const filtered = prev.filter(a => a.session_id !== sessionId);
+          return [normalizedSession, ...filtered];
         });
 
-        // B. Update Dashboard Summary Metrics
+        // B. Update Dashboard Summary Metrics INSTANTLY on frame
         setSummaryData(prev => {
           const currentRecent = prev.recent_attacks || [];
-          const updatedRecent = currentRecent.some(a => a.session_id === sessionId)
-            ? currentRecent.map(a => (a.session_id === sessionId ? { ...a, ...sessionDoc } : a))
-            : [sessionDoc, ...currentRecent].slice(0, 20);
+          const filteredRecent = currentRecent.filter(a => a.session_id !== sessionId);
+          const updatedRecent = [normalizedSession, ...filteredRecent].slice(0, 20);
+
+          const isNewSession = !currentRecent.some(a => a.session_id === sessionId);
+          const svc = (normalizedSession.service || 'web').toLowerCase();
+          const prevDist = prev.service_distribution || { ssh: 0, http: 0, web: 0, api: 0, ftp: 0 };
+          const updatedDist = {
+            ...prevDist,
+            [svc]: (prevDist[svc] || 0) + 1,
+          };
 
           return {
             ...prev,
+            total_sessions: (prev.total_sessions || 0) + (isNewSession ? 1 : 0),
             total_events: (prev.total_events || 0) + 1,
-            active_sessions: (sessionDoc.status === 'ACTIVE' || !sessionDoc.status)
-              ? Math.max((prev.active_sessions || 0), 1)
+            active_sessions: (normalizedSession.status === 'ACTIVE')
+              ? Math.max((prev.active_sessions || 0) + (isNewSession ? 1 : 0), 1)
               : prev.active_sessions,
             total_iocs: (prev.total_iocs || 0) + newIocs.length,
             recent_attacks: updatedRecent,
+            service_distribution: updatedDist,
           };
         });
 
@@ -251,7 +290,7 @@ export default function App() {
   const activeAttackCount = attacks.filter(a => (a.status || '').toUpperCase() === 'ACTIVE').length;
 
   const pages = {
-    command:       <CommandCenter summaryData={summaryData} loading={loading} onSelectAttack={handleSelectAttack} onContain={handleContain} />,
+    command:       <CommandCenter summaryData={summaryData} attacks={attacks} loading={loading} onSelectAttack={handleSelectAttack} onContain={handleContain} />,
     live:          <LiveAttacks attacks={attacks} onSelectAttack={handleSelectAttack} onContain={handleContain} />,
     investigation: <AttackInvestigation sessionData={sessionDetails} onContainSession={handleContain} />,
     dna:           <AttackerDNA attackers={attackers} />,
