@@ -152,42 +152,6 @@ export default function ThreatReport({ reportData, onContainSession }) {
         </div>
       </div>
 
-      {/* BLOCKCHAIN EVIDENCE INTEGRITY STAMP */}
-      <div className="card p-5 border-l-4" style={{
-        borderLeftColor: isTampered ? '#e11d48' : '#059669'
-      }}>
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-              isTampered ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'
-            }`}>
-              {isTampered ? <XCircle className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Tamper-Evident Evidence Seal
-                </h4>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                  isTampered ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
-                }`}>
-                  {isTampered ? '⚠️ TAMPER DETECTED' : '✓ VERIFIED ON-CHAIN'}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Cryptographic SHA-256 hash proof registered on Kurukshetra Evidence Ledger
-              </p>
-            </div>
-          </div>
-
-          {blockchain_proof && (
-            <div className="text-right text-[11px] font-mono text-slate-500">
-              <p>Evidence ID: <strong className="text-slate-800">{blockchain_proof.evidence_id}</strong> (Block #{blockchain_proof.block_index})</p>
-              <p className="truncate max-w-xs">Hash: {blockchain_proof.event_hash}</p>
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* Executive Summary */}
       {executive_summary && (
