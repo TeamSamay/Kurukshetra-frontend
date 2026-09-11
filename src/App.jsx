@@ -13,22 +13,40 @@ import {
   fetchIOCs, fetchAttackers, fetchMitre, fetchReport, containSession,
 } from './services/api';
 import { AttackWebSocketManager } from './services/websocket';
+import { ShieldAlert, Zap, Lock, X } from 'lucide-react';
 
-// ─── Toast Notification ───────────────────────────────────────────────────────
-function Toast({ msg, title = 'SECURITY ALERT', onClose }) {
+// ─── Modern Enterprise Cyber Toast ──────────────────────────────────────────
+function Toast({ msg, title = 'SECURITY EVENT', onClose }) {
   useEffect(() => {
-    const t = setTimeout(onClose, 6000);
+    const t = setTimeout(onClose, 5000);
     return () => clearTimeout(t);
   }, [msg, onClose]);
 
+  const isContainment = title.includes('CONTAINMENT');
+  const isCritical = title.includes('CRITICAL') || title.includes('ATTACK');
+
   return (
-    <div className="w-full max-w-sm rounded-2xl p-3.5 flex items-start gap-3 bg-[#1e1e22] text-white border border-rose-500/40 shadow-2xl slide-right">
-      <div className="w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0 bg-rose-500 blink" />
-      <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-bold text-rose-400 tracking-wider font-mono uppercase">{title}</p>
-        <p className="text-xs mt-0.5 text-neutral-200 font-mono break-all leading-snug">{msg}</p>
+    <div className="w-full max-w-sm rounded-2xl p-3.5 flex items-start gap-3 bg-white/95 backdrop-blur-md text-neutral-900 border border-neutral-200/80 shadow-xl slide-right transition-all">
+      <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${
+        isContainment ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
+        isCritical ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-amber-50 text-amber-600 border border-amber-200'
+      }`}>
+        {isContainment ? <Lock className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
       </div>
-      <button onClick={onClose} className="text-neutral-400 hover:text-white transition-colors flex-shrink-0 text-sm font-bold cursor-pointer">✕</button>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+            isContainment ? 'bg-emerald-100 text-emerald-800' :
+            isCritical ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+          }`}>
+            {title}
+          </span>
+        </div>
+        <p className="text-xs mt-1 font-mono text-neutral-700 truncate leading-snug">{msg}</p>
+      </div>
+      <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700 transition-colors p-1 cursor-pointer">
+        <X className="w-3.5 h-3.5" />
+      </button>
     </div>
   );
 }
@@ -49,25 +67,32 @@ export default function App() {
 
   const selectedIdRef = React.useRef(selectedId);
   selectedIdRef.current = selectedId;
+  const lastToastTimeRef = React.useRef(0);
 
-  // ── Toast helpers ─────────────────────────────────────────────────────────
+  // ── Toast helpers with rate-limiting ──────────────────────────────────────
   const addToast = useCallback((msg, title = 'SECURITY ALERT') => {
-    const id = Date.now();
+    const now = Date.now();
+    // Rate limit toasts to maximum 1 every 2.5s to avoid flood
+    if (now - lastToastTimeRef.current < 2500) {
+      return;
+    }
+    lastToastTimeRef.current = now;
+
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(880, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.2);
-      gain.gain.setValueAtTime(0.12, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start();
-      osc.stop(ctx.currentTime + 0.2);
+      osc.stop(ctx.currentTime + 0.15);
     } catch {}
-    setToasts(prev => [...prev.slice(-3), { id, msg, title }]);
+    setToasts(prev => [...prev.slice(-2), { id: now, msg, title }]);
   }, []);
 
   const removeToast = useCallback((id) => {
@@ -84,7 +109,7 @@ export default function App() {
         fetchAttackers(),
         fetchMitre(),
       ]);
-      if (sum.status     === 'fulfilled' && sum.value) {
+      if (sum.status === 'fulfilled' && sum.value) {
         setSummaryData(prev => ({
           ...sum.value,
           total_events: Math.max(sum.value.total_events ?? 0, prev.total_events ?? 0),
@@ -98,17 +123,22 @@ export default function App() {
             : (sum.value.recent_attacks || []),
         }));
       }
-      if (atks.status    === 'fulfilled' && atks.value) {
+      if (atks.status === 'fulfilled' && atks.value) {
         setAttacks(prev => {
           if (!prev || prev.length === 0) return atks.value;
           const recentTop = prev.slice(0, 3);
           const remaining = atks.value.filter(a => !recentTop.some(r => r.session_id === a.session_id));
           return [...recentTop, ...remaining];
         });
+
+        // Auto-select first session if none selected yet
+        if (!selectedIdRef.current && atks.value.length > 0) {
+          setSelectedId(atks.value[0].session_id);
+        }
       }
-      if (iocs.status    === 'fulfilled' && iocs.value)    setIocList(iocs.value);
-      if (atkrs.status   === 'fulfilled' && atkrs.value)   setAttackers(atkrs.value);
-      if (mitre.status   === 'fulfilled' && mitre.value)   setMitreData(mitre.value);
+      if (iocs.status  === 'fulfilled' && iocs.value)  setIocList(iocs.value);
+      if (atkrs.status === 'fulfilled' && atkrs.value) setAttackers(atkrs.value);
+      if (mitre.status === 'fulfilled' && mitre.value) setMitreData(mitre.value);
     } catch (e) {
       console.error('[App] Data load failed:', e);
     } finally {
@@ -117,6 +147,7 @@ export default function App() {
   }, []);
 
   const loadSession = useCallback(async (id) => {
+    if (!id) return;
     try {
       const [sess, rep] = await Promise.allSettled([
         fetchSessionDetails(id),
@@ -132,12 +163,20 @@ export default function App() {
   // Initial load
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  // Load session when selected
-  useEffect(() => { if (selectedId) loadSession(selectedId); }, [selectedId, loadSession]);
-
-  // Fast background auto-refresh every 5s for guaranteed sync
+  // Load session when selected or when switching to investigation/reports
   useEffect(() => {
-    const t = setInterval(loadAll, 5000);
+    if (selectedId) {
+      loadSession(selectedId);
+    } else if (attacks.length > 0 && (activeTab === 'investigation' || activeTab === 'report')) {
+      const firstId = attacks[0].session_id;
+      setSelectedId(firstId);
+      loadSession(firstId);
+    }
+  }, [selectedId, activeTab, attacks, loadSession]);
+
+  // Background sync every 6s
+  useEffect(() => {
+    const t = setInterval(loadAll, 6000);
     return () => clearInterval(t);
   }, [loadAll]);
 
@@ -238,11 +277,17 @@ export default function App() {
           setMitreData(prev => [...newMitre, ...prev]);
         }
 
-        // F. Trigger Instant Alert Toast & Sound
+        // F. Trigger Instant Alert Toast & Sound (filtered to meaningful attack actions)
         const sourceIp = eventObj.source_ip || sessionDoc.source_ip || 'Unknown Attacker';
         const svc = (eventObj.service || sessionDoc.service || 'HONEYPOT').toUpperCase();
         const action = eventObj.event || eventObj.event_type || 'Interaction detected';
-        addToast(`${sourceIp} → ${action.slice(0, 50)}`, `🚨 LIVE ${svc} ATTACK`);
+        const actLower = action.toLowerCase();
+
+        // Skip routine connection closures, pings, or background noise
+        const isNoise = actLower.includes('closed') || actLower.includes('disconnected') || actLower.includes('handshake') || actLower.includes('probe');
+        if (!isNoise) {
+          addToast(`${sourceIp} → ${action.slice(0, 48)}`, `LIVE ${svc} ATTACK`);
+        }
       }
     }
 
