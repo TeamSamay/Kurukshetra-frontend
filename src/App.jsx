@@ -254,7 +254,7 @@ export default function App() {
   const activeAttackCount = attacks.filter(a => (a.status || '').toUpperCase() === 'ACTIVE').length;
 
   const pages = {
-    command:       <CommandCenter summaryData={summaryData} loading={loading} />,
+    command:       <CommandCenter summaryData={summaryData} loading={loading} onSelectAttack={handleSelectAttack} onContain={handleContain} />,
     live:          <LiveAttacks attacks={attacks} onSelectAttack={handleSelectAttack} onContain={handleContain} />,
     investigation: <AttackInvestigation sessionData={sessionDetails} onContainSession={handleContain} />,
     dna:           <AttackerDNA attackers={attackers} />,
