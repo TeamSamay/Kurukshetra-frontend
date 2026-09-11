@@ -7,6 +7,7 @@ import AttackerDNA from './components/AttackerDNA';
 import IOCIntelligence from './components/IOCIntelligence';
 import MitreAttack from './components/MitreAttack';
 import ThreatReport from './components/ThreatReport';
+import SafeSandboxTerminal from './components/SafeSandboxTerminal';
 
 import {
   fetchDashboardSummary, fetchAttacks, fetchSessionDetails,
@@ -65,6 +66,7 @@ export default function App() {
   const [reportData, setReportData]     = useState(null);
   const [toasts, setToasts]             = useState([]);
   const [loading, setLoading]           = useState(false);
+  const [showSandbox, setShowSandbox]   = useState(false);
 
   const selectedIdRef = React.useRef(selectedId);
   selectedIdRef.current = selectedId;
@@ -198,14 +200,14 @@ export default function App() {
           session_id: sessionId,
           timestamp: nowIso,
           last_seen: nowIso,
-          source_ip: sessionDoc.source_ip || eventObj.source_ip || 'Unknown Attacker',
-          service: sessionDoc.service || eventObj.service || 'web',
+          source_ip: sessionDoc.source_ip || eventObj.source_ip || '198.51.100.88',
+          service: sessionDoc.service || eventObj.service || 'ssh',
           status: sessionDoc.status || 'ACTIVE',
           risk_level: sessionDoc.risk_level || 'HIGH',
           event: eventObj.event || eventObj.event_type || 'Interaction detected',
         };
 
-        // A. Update Attacks List: Always move the active/updated attack to the very TOP (index 0)
+        // A. Update Attacks List
         setAttacks(prev => {
           const filtered = prev.filter(a => a.session_id !== sessionId);
           return [normalizedSession, ...filtered];
@@ -218,7 +220,7 @@ export default function App() {
           const updatedRecent = [normalizedSession, ...filteredRecent].slice(0, 20);
 
           const isNewSession = !currentRecent.some(a => a.session_id === sessionId);
-          const svc = (normalizedSession.service || 'web').toLowerCase();
+          const svc = (normalizedSession.service || 'ssh').toLowerCase();
           const prevDist = prev.service_distribution || { ssh: 0, http: 0, web: 0, api: 0, ftp: 0 };
           const updatedDist = {
             ...prevDist,
@@ -268,14 +270,13 @@ export default function App() {
           setMitreData(prev => [...newMitre, ...prev]);
         }
 
-        // F. Trigger Instant Alert Toast & Sound (filtered to meaningful attack actions)
+        // F. Trigger Instant Alert Toast & Sound
         const sourceIp = eventObj.source_ip || sessionDoc.source_ip || 'Unknown Attacker';
         const svc = (eventObj.service || sessionDoc.service || 'HONEYPOT').toUpperCase();
         const action = eventObj.event || eventObj.event_type || 'Interaction detected';
         const actLower = action.toLowerCase();
 
-        // Skip routine connection closures, pings, or background noise
-        const isNoise = actLower.includes('closed') || actLower.includes('disconnected') || actLower.includes('handshake') || actLower.includes('probe');
+        const isNoise = actLower.includes('closed') || actLower.includes('disconnected') || actLower.includes('handshake') || actLower.includes('probe') || actLower.includes('-> 307') || actLower.includes('-> 200') || actLower.includes('get / ') || actLower.includes('get /login') || actLower.includes('started');
         if (!isNoise) {
           addToast(`${sourceIp} → ${action.slice(0, 48)}`, `LIVE ${svc} ATTACK`);
         }
@@ -332,13 +333,13 @@ export default function App() {
     dna:           <AttackerDNA attackers={attackers} />,
     ioc:           <IOCIntelligence iocList={iocList} />,
     mitre:         <MitreAttack mitreData={mitreData} />,
-    report:        <ThreatReport reportData={reportData} onContainSession={handleContain} />,
+    report:        <ThreatReport reportData={reportData} onContainSession={handleContain} attacks={attacks} />,
   };
 
   return (
     <>
-      {/* Toast Notifications - Clean bottom-right positioning */}
-      <div className="fixed bottom-6 right-6 z-[200] space-y-2 pointer-events-none max-w-sm w-full">
+      {/* Toast Notifications */}
+      <div className="fixed bottom-6 right-6 z-[200] space-y-2 pointer-events-none max-w-sm w-full print:hidden">
         {toasts.map(t => (
           <div key={t.id} className="pointer-events-auto">
             <Toast msg={t.msg} title={t.title} onClose={() => removeToast(t.id)} />
@@ -346,11 +347,20 @@ export default function App() {
         ))}
       </div>
 
+      {/* Safe Attacker Sandbox Terminal Modal */}
+      {showSandbox && (
+        <SafeSandboxTerminal
+          onClose={() => setShowSandbox(false)}
+          onEventIngested={() => loadAll()}
+        />
+      )}
+
       <Layout
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         wsConnected={wsConnected}
         activeAttackCount={activeAttackCount}
+        onOpenSandbox={() => setShowSandbox(true)}
       >
         {pages[activeTab]}
       </Layout>

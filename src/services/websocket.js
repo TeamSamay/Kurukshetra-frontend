@@ -1,22 +1,29 @@
-// Connects to live Render WebSocket (wss://kurukshetra-backend.onrender.com/ws/attacks) by default
+// Kurukshetra Dynamic WebSocket Service
+// Connects to local WebSocket (ws://127.0.0.1:8000/ws/attacks) when on localhost,
+// or secure cloud Render WebSocket (wss://kurukshetra-backend.onrender.com/ws/attacks) when deployed.
+
 export function getWsEndpoint() {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
-    // On Vercel or any remote production domain (HTTPS), ALWAYS use secure WSS Render backend
-    if (host.includes('vercel.app') || (host !== 'localhost' && host !== '127.0.0.1' && !host.startsWith('192.168.'))) {
+    // If on localhost or 127.0.0.1, prioritize local backend WebSocket
+    if (host === 'localhost' || host === '127.0.0.1') {
+      if (import.meta.env.VITE_WS_URL) {
+        const base = import.meta.env.VITE_WS_URL.replace(/\/$/, '');
+        return `${base}/ws/attacks`;
+      }
+      return 'ws://127.0.0.1:8000/ws/attacks';
+    }
+    // On Vercel or any remote production domain (HTTPS), use secure WSS Render backend
+    if (host.includes('vercel.app') || (!host.startsWith('192.168.') && host !== 'localhost')) {
       return 'wss://kurukshetra-backend.onrender.com/ws/attacks';
     }
   }
-  if (import.meta.env.VITE_WS_URL && !import.meta.env.VITE_WS_URL.includes('127.0.0.1') && !import.meta.env.VITE_WS_URL.includes('localhost')) {
+  if (import.meta.env.VITE_WS_URL) {
     const base = import.meta.env.VITE_WS_URL.replace(/\/$/, '');
     return `${base}/ws/attacks`;
   }
-  return 'wss://kurukshetra-backend.onrender.com/ws/attacks';
+  return 'ws://127.0.0.1:8000/ws/attacks';
 }
-
-const WS_ENDPOINT = getWsEndpoint();
-const MAX_RETRIES_BEFORE_POLL = 5;
-const POLL_INTERVAL_MS = 10000;
 
 export class AttackWebSocketManager {
   constructor(_unused, onMessage, onStatus) {
@@ -26,9 +33,7 @@ export class AttackWebSocketManager {
     this._stopped   = false;
     this._retries   = 0;
     this._backoffMs = 2000;
-    this._pollTimer = null;
     this._pingTimer = null;
-    this._polling   = false;
   }
 
   connect() {
@@ -40,9 +45,7 @@ export class AttackWebSocketManager {
       this.ws.onopen = () => {
         this._retries   = 0;
         this._backoffMs = 2000;
-        this._stopPolling();
         this._startPing();
-        this._polling = false;
         if (this.onStatus) this.onStatus(true, 'CONNECTED');
       };
 
@@ -73,7 +76,6 @@ export class AttackWebSocketManager {
 
   _startPing() {
     this._stopPing();
-    // Send keepalive ping every 15s to prevent Render cloud proxy timeout
     this._pingTimer = setInterval(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         try {
@@ -100,17 +102,9 @@ export class AttackWebSocketManager {
     }, delay);
   }
 
-  _stopPolling() {
-    if (this._pollTimer) {
-      clearInterval(this._pollTimer);
-      this._pollTimer = null;
-    }
-  }
-
   disconnect() {
     this._stopped = true;
     this._stopPing();
-    this._stopPolling();
     if (this.ws) {
       try { this.ws.close(); } catch {}
       this.ws = null;
