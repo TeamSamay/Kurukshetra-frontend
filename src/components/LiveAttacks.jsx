@@ -22,8 +22,10 @@ function statusBadge(status) {
 
 function formatTime(ts) {
   if (!ts) return '--:--';
-  return new Date(ts).toLocaleString('en-GB', {
-    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '--:--';
+  return d.toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
   });
 }
 
@@ -66,8 +68,8 @@ function AttackRow({ atk, onSelect, onContain }) {
         <td className="px-4 py-3">
           <span className={`badge ${st.cls}`}>{st.label}</span>
         </td>
-        <td className="px-4 py-3 text-xs text-slate-400 font-mono">
-          {formatTime(atk.timestamp || atk.created_at)}
+        <td className="px-4 py-3 text-xs text-slate-500 font-mono whitespace-nowrap">
+          {formatTime(atk.last_seen || atk.start_time || atk.timestamp || atk.created_at)}
         </td>
         <td className="px-4 py-3">
           <div className="flex items-center gap-2">
@@ -97,7 +99,7 @@ function AttackRow({ atk, onSelect, onContain }) {
               </div>
               <div>
                 <p className="text-[10px] font-bold tracking-widest uppercase mb-1 text-slate-400">Attacker DNA</p>
-                <p className="font-mono font-bold text-slate-800">{atk.attacker_dna || '—'}</p>
+                <p className="font-mono font-bold text-slate-800">{atk.fingerprint || atk.attacker_dna || '—'}</p>
               </div>
               <div>
                 <p className="text-[10px] font-bold tracking-widest uppercase mb-1 text-slate-400">Risk Score</p>

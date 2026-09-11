@@ -22,7 +22,7 @@ function Toast({ msg, title = 'SECURITY ALERT', onClose }) {
   }, [msg, onClose]);
 
   return (
-    <div className="fixed top-4 right-4 z-[200] max-w-sm w-full slide-right">
+    <div className="fixed top-20 right-6 z-[200] max-w-sm w-full slide-right">
       <div className="card px-4 py-3 flex items-start gap-3 border border-rose-500/50 shadow-2xl rounded-xl"
         style={{ background: '#0b1120', boxShadow: '0 0 25px rgba(244,63,94,0.35)' }}>
         <div className="w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0 bg-rose-500 blink" />

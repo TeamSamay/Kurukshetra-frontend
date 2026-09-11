@@ -29,7 +29,7 @@ function LiveClock() {
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
   }, []);
-  return <span className="font-mono text-[11px] font-bold text-slate-700 tabular-nums">{time}</span>;
+  return <span className="font-mono text-[11px] font-bold text-slate-700 tabular-nums whitespace-nowrap">{time}</span>;
 }
 
 export default function Layout({ activeTab, setActiveTab, wsConnected, activeAttackCount, children }) {
@@ -218,8 +218,8 @@ export default function Layout({ activeTab, setActiveTab, wsConnected, activeAtt
           {/* Right: status items */}
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
             {/* Live Clock (Always Visible) */}
-            <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 shadow-xs">
-              <Clock className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 shadow-xs flex-shrink-0 min-w-max whitespace-nowrap">
+              <Clock className="w-3.5 h-3.5 text-blue-600 animate-pulse flex-shrink-0" />
               <LiveClock />
             </div>
 
