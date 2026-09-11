@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   ArrowUpRight, Play, Pause, Clock, ChevronDown, ChevronUp,
   MoreVertical, Check, Laptop, Zap, MessageSquare, Edit3, Link2,
-  Users, UserPlus, FolderKanban, ChevronLeft, ChevronRight
+  Users, UserPlus, FolderKanban
 } from 'lucide-react';
 import { fetchDashboardSummary } from '../services/api';
 
@@ -21,7 +21,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
   // Time tracker interactive state
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(155); // 02:35
-  const [activeDayIndex, setActiveDayIndex] = useState(5); // Friday
+  const [activeDayIndex, setActiveDayIndex] = useState(5); // Friday (index 5)
 
   // Task checklist state
   const [tasks, setTasks] = useState([
@@ -108,7 +108,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
             {/* Interviews / Threats */}
             <div className="flex items-center gap-2">
               <span className="text-neutral-500 font-medium text-[13px]">Interviews</span>
-              <span className="bg-[#1e1e22] text-white px-3 py-1 rounded-full font-semibold text-xs shadow-sm">
+              <span className="bg-[#1e1e22] text-white px-3 py-1 rounded-full font-semibold text-xs shadow-xs">
                 15%
               </span>
             </div>
@@ -116,7 +116,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
             {/* Hired / Contained */}
             <div className="flex items-center gap-2">
               <span className="text-neutral-500 font-medium text-[13px]">Hired</span>
-              <span className="bg-[#f8c858] text-neutral-900 px-3 py-1 rounded-full font-bold text-xs shadow-sm">
+              <span className="bg-[#f8c858] text-neutral-900 px-3 py-1 rounded-full font-bold text-xs shadow-xs">
                 15%
               </span>
             </div>
@@ -124,7 +124,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
             {/* Project time / Deception Uptime */}
             <div className="flex items-center gap-2">
               <span className="text-neutral-500 font-medium text-[13px]">Project time</span>
-              <div className="h-7 min-w-[140px] sm:min-w-[190px] rounded-full border border-neutral-300 bg-white/70 overflow-hidden relative flex items-center px-3 shadow-sm">
+              <div className="h-7 min-w-[140px] sm:min-w-[190px] rounded-full border border-neutral-300 bg-white/70 overflow-hidden relative flex items-center px-3 shadow-xs">
                 <div className="absolute inset-0 striped-pattern w-[60%] border-r border-neutral-300/80 bg-neutral-100/50" />
                 <span className="relative z-10 text-[11px] font-bold text-neutral-800">60%</span>
               </div>
@@ -133,7 +133,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
             {/* Output / IOCs */}
             <div className="flex items-center gap-2">
               <span className="text-neutral-500 font-medium text-[13px]">Output</span>
-              <span className="border border-neutral-400 bg-white/80 text-neutral-800 px-3 py-1 rounded-full font-semibold text-xs shadow-sm">
+              <span className="border border-neutral-400 bg-white/80 text-neutral-800 px-3 py-1 rounded-full font-semibold text-xs shadow-xs">
                 10%
               </span>
             </div>
@@ -144,7 +144,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
         <div className="flex items-center gap-8 sm:gap-12 flex-shrink-0 self-start lg:self-end">
           {/* Stat 1 */}
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/60 border border-neutral-200/80 flex items-center justify-center text-neutral-600 shadow-sm">
+            <div className="w-8 h-8 rounded-full bg-white/60 border border-neutral-200/80 flex items-center justify-center text-neutral-600 shadow-xs">
               <Users className="w-4 h-4" />
             </div>
             <div>
@@ -157,7 +157,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
 
           {/* Stat 2 */}
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/60 border border-neutral-200/80 flex items-center justify-center text-neutral-600 shadow-sm">
+            <div className="w-8 h-8 rounded-full bg-white/60 border border-neutral-200/80 flex items-center justify-center text-neutral-600 shadow-xs">
               <UserPlus className="w-4 h-4" />
             </div>
             <div>
@@ -170,7 +170,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
 
           {/* Stat 3 */}
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/60 border border-neutral-200/80 flex items-center justify-center text-neutral-600 shadow-sm">
+            <div className="w-8 h-8 rounded-full bg-white/60 border border-neutral-200/80 flex items-center justify-center text-neutral-600 shadow-xs">
               <FolderKanban className="w-4 h-4" />
             </div>
             <div>
@@ -200,7 +200,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
                   e.target.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80';
                 }}
               />
-              {/* Subtle Gradient Shadow for bottom text readability */}
+              {/* Gradient overlay for bottom typography */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
 
               {/* Bottom Card Overlay */}
@@ -211,7 +211,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
                   </h3>
                   <p className="text-xs font-normal text-white/80">UX/UI Designer</p>
                 </div>
-                <div className="px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white font-medium text-xs shadow-sm">
+                <div className="px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white font-medium text-xs shadow-xs">
                   $1,200
                 </div>
               </div>
@@ -347,7 +347,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
                     >
                       {/* Floating Tooltip for Active Day */}
                       {idx === activeDayIndex && (
-                        <div className="bg-[#f8c858] text-neutral-900 font-bold text-[10px] px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap mb-1">
+                        <div className="bg-[#f8c858] text-neutral-900 font-bold text-[10px] px-2 py-0.5 rounded-full shadow-xs whitespace-nowrap mb-1">
                           {day.tooltip || '5h 23m'}
                         </div>
                       )}
@@ -435,7 +435,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
               <div className="flex items-center justify-center gap-3 pt-2">
                 <button
                   onClick={() => setTimerRunning(true)}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center border border-neutral-200 transition shadow-sm ${
+                  className={`w-9 h-9 rounded-full flex items-center justify-center border border-neutral-200 transition shadow-xs ${
                     timerRunning ? 'bg-neutral-100 text-neutral-400' : 'bg-white hover:bg-neutral-50 text-neutral-800'
                   }`}
                   title="Play"
@@ -444,7 +444,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
                 </button>
                 <button
                   onClick={() => setTimerRunning(false)}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center border border-neutral-200 transition shadow-sm ${
+                  className={`w-9 h-9 rounded-full flex items-center justify-center border border-neutral-200 transition shadow-xs ${
                     !timerRunning ? 'bg-neutral-100 text-neutral-400' : 'bg-white hover:bg-neutral-50 text-neutral-800'
                   }`}
                   title="Pause"
@@ -453,7 +453,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
                 </button>
                 <button
                   onClick={() => setTimerSeconds(0)}
-                  className="w-9 h-9 rounded-full flex items-center justify-center bg-[#1e1e22] text-white hover:bg-black transition shadow-sm"
+                  className="w-9 h-9 rounded-full flex items-center justify-center bg-[#1e1e22] text-white hover:bg-black transition shadow-xs"
                   title="Reset Timer"
                 >
                   <Clock className="w-3.5 h-3.5" />
@@ -556,18 +556,18 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 {/* 30% Task Yellow Pill */}
-                <div className="bg-[#f8c858] text-neutral-900 px-3 py-1.5 rounded-full text-xs font-bold flex items-center justify-between min-w-[85px] shadow-sm">
+                <div className="bg-[#f8c858] text-neutral-900 px-3 py-1.5 rounded-full text-xs font-bold flex items-center justify-between min-w-[85px] shadow-xs">
                   <span>30%</span>
                   <span className="text-[10px] font-semibold text-neutral-800 ml-1">Task</span>
                 </div>
 
                 {/* 25% Dark Pill */}
-                <div className="bg-[#1e1e22] text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm">
+                <div className="bg-[#1e1e22] text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-xs">
                   25%
                 </div>
 
                 {/* 0% Gray Pill */}
-                <div className="bg-neutral-400 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm">
+                <div className="bg-neutral-400 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-xs">
                   0%
                 </div>
               </div>
@@ -612,7 +612,7 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
                     {/* Checkmark Status Indicator */}
                     <div className="flex-shrink-0">
                       {task.done ? (
-                        <div className="w-5 h-5 rounded-full bg-[#f8c858] flex items-center justify-center text-neutral-950 shadow-sm">
+                        <div className="w-5 h-5 rounded-full bg-[#f8c858] flex items-center justify-center text-neutral-950 shadow-xs">
                           <Check className="w-3 h-3 stroke-[3]" />
                         </div>
                       ) : (
@@ -630,5 +630,3 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
     </div>
   );
 }
-
-
