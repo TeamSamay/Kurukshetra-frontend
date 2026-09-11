@@ -143,7 +143,7 @@ export default function IOCIntelligence({ iocList = [] }) {
               <button key={t} onClick={() => setFilterType(t)}
                 className={`text-[11px] font-bold px-3 py-1 rounded-lg capitalize transition-all ${
                   filterType === t
-                    ? 'shadow-xs'
+                    ? 'shadow-sm'
                     : 'btn-ghost'
                 }`}
                 style={filterType === t ? { background: meta.bg, border: `1px solid ${meta.border}`, color: meta.color } : {}}>

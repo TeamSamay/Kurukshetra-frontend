@@ -1,110 +1,38 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Server, Target, AlertTriangle, Database, Activity, Clock,
-  Shield, Globe, Zap, TrendingUp, Eye, Radio
+  ArrowUpRight, Play, Pause, Clock, ChevronDown, ChevronUp,
+  MoreVertical, Check, Laptop, Zap, MessageSquare, Edit3, Link2,
+  Users, UserPlus, FolderKanban, ChevronLeft, ChevronRight
 } from 'lucide-react';
-import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  BarChart, Bar, PieChart, Pie, Cell
-} from 'recharts';
 import { fetchDashboardSummary } from '../services/api';
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function Skeleton({ className = '' }) {
-  return <div className={`shimmer ${className}`} />;
-}
-
-function StatCard({ label, value, sub, icon: Icon, accent, loading }) {
-  const colors = {
-    blue:    { bg: 'bg-blue-50',    border: 'border-blue-100',    icon: 'text-blue-600',    glow: 'rgba(37,99,235,0.06)' },
-    rose:    { bg: 'bg-rose-50',    border: 'border-rose-100',    icon: 'text-rose-600',    glow: 'rgba(225,29,72,0.06)' },
-    amber:   { bg: 'bg-amber-50',   border: 'border-amber-100',   icon: 'text-amber-600',   glow: 'rgba(217,119,6,0.06)' },
-    emerald: { bg: 'bg-emerald-50', border: 'border-emerald-100', icon: 'text-emerald-600', glow: 'rgba(5,150,105,0.06)' },
-    purple:  { bg: 'bg-purple-50',  border: 'border-purple-100',  icon: 'text-purple-600',  glow: 'rgba(124,58,237,0.06)' },
-    cyan:    { bg: 'bg-sky-50',     border: 'border-sky-100',     icon: 'text-sky-600',     glow: 'rgba(2,132,199,0.06)' },
-  };
-  const c = colors[accent] || colors.blue;
-
-  return (
-    <div className="card p-5 flex items-start gap-4 hover:shadow-md transition-all duration-200"
-      style={{ boxShadow: `0 4px 20px ${c.glow}` }}>
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${c.bg} border ${c.border}`}>
-        <Icon className={`w-5 h-5 ${c.icon}`} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-bold tracking-widest uppercase mb-1 text-slate-400">
-          {label}
-        </p>
-        {loading ? (
-          <><Skeleton className="h-7 w-16 mb-1" /><Skeleton className="h-3 w-24" /></>
-        ) : (
-          <>
-            <p className="text-2xl font-black text-slate-800 tracking-tight leading-none">{value}</p>
-            <p className={`text-[11px] font-semibold mt-1 ${c.icon}`}>{sub}</p>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-const CHART_COLORS = {
-  ssh:   '#7c3aed',
-  http:  '#2563eb',
-  ftp:   '#0284c7',
-  other: '#94a3b8',
-};
-
-const TOOLTIP_STYLE = {
-  background: '#ffffff',
-  border: '1px solid #e2e8f0',
-  borderRadius: 10,
-  fontSize: 12,
-  color: '#0f172a',
-  boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
-};
-
-function buildServiceDonut(serviceDistribution) {
-  return Object.entries(serviceDistribution || {}).map(([name, value]) => ({
-    name: name.toUpperCase(),
-    value,
-    color: CHART_COLORS[name.toLowerCase()] || '#94a3b8',
-  }));
-}
-
-function buildTechBars(topMitre) {
-  return (topMitre || []).slice(0, 6).map(t => ({
-    name: (t.technique_id || t.name || '').slice(0, 12),
-    count: t.count || t.frequency || 1,
-  }));
-}
-
-// Build attack trend from recent_attacks timestamps
-function buildTrend(recentAttacks) {
-  if (!recentAttacks || recentAttacks.length === 0) {
-    return Array.from({ length: 8 }, (_, i) => ({ time: `${i * 3}h`, attacks: 0, iocs: 0 }));
-  }
-  const buckets = {};
-  recentAttacks.forEach(a => {
-    const rawTs = a.last_seen || a.start_time || a.timestamp || a.created_at;
-    const h = rawTs ? new Date(rawTs).getHours() : new Date().getHours();
-    const key = `${String(h).padStart(2, '0')}:00`;
-    buckets[key] = (buckets[key] || 0) + 1;
-  });
-  return Object.entries(buckets).map(([time, attacks]) => ({ time, attacks, iocs: Math.floor(attacks * 1.4) }));
-}
-
-function formatTime(ts) {
-  if (!ts) return '--:--';
-  const d = new Date(ts);
-  if (isNaN(d.getTime())) return '--:--';
-  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
 
 export default function CommandCenter({ summaryData, loading: parentLoading }) {
   const [data, setData] = useState(summaryData || {});
   const [loading, setLoading] = useState(parentLoading ?? true);
 
+  // Accordion state
+  const [openAccordion, setOpenAccordion] = useState({
+    pension: false,
+    devices: true,
+    compensation: false,
+    benefits: false,
+  });
+
+  // Time tracker interactive state
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState(155); // 02:35
+  const [activeDayIndex, setActiveDayIndex] = useState(5); // Friday
+
+  // Task checklist state
+  const [tasks, setTasks] = useState([
+    { id: 1, title: 'Interview', time: 'Sep 13, 08:30', icon: Laptop, done: true },
+    { id: 2, title: 'Team Meeting', time: 'Sep 13, 10:30', icon: Zap, done: true },
+    { id: 3, title: 'Project Update', time: 'Sep 13, 13:00', icon: MessageSquare, done: false },
+    { id: 4, title: 'Discuss Q3 Goals', time: 'Sep 13, 14:45', icon: Edit3, done: false },
+    { id: 5, title: 'HR Policy Review', time: 'Sep 13, 16:30', icon: Link2, done: false },
+  ]);
+
+  // Sync summary data
   useEffect(() => {
     if (summaryData && Object.keys(summaryData).length > 0) {
       setData(summaryData);
@@ -112,252 +40,595 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
     }
   }, [summaryData]);
 
-  // Auto-refresh every 15s
+  // Auto-refresh summary
   useEffect(() => {
     const t = setInterval(async () => {
       try {
         const d = await fetchDashboardSummary();
-        setData(d || {});
-        setLoading(false);
+        if (d) {
+          setData(d);
+          setLoading(false);
+        }
       } catch {}
     }, 15000);
     return () => clearInterval(t);
   }, []);
 
+  // Timer tick
+  useEffect(() => {
+    let interval = null;
+    if (timerRunning) {
+      interval = setInterval(() => {
+        setTimerSeconds(s => s + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [timerRunning]);
+
+  const formatTimer = (totalSecs) => {
+    const m = Math.floor(totalSecs / 60);
+    const s = totalSecs % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const toggleTask = (id) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  };
+
+  const completedCount = tasks.filter(t => t.done).length;
+
   const {
-    total_sessions      = 0,
-    active_sessions     = 0,
-    contained_sessions  = 0,
-    critical_risk_sessions = 0,
-    high_risk_sessions  = 0,
-    total_events        = 0,
-    total_iocs          = 0,
-    top_mitre_techniques= [],
-    recent_attacks      = [],
-    service_distribution= {},
+    total_sessions = 78,
+    contained_sessions = 56,
+    total_iocs = 203,
   } = data;
 
-  const donutData = buildServiceDonut(service_distribution);
-  const techBars  = buildTechBars(top_mitre_techniques);
-  const trendData = buildTrend(recent_attacks);
-  const totalDonut = donutData.reduce((s, d) => s + d.value, 0);
+  const daysOfWeek = [
+    { label: 'S', height: '35%', active: false, tooltip: null },
+    { label: 'M', height: '75%', active: false, tooltip: null },
+    { label: 'T', height: '60%', active: false, tooltip: null },
+    { label: 'W', height: '45%', active: false, tooltip: null },
+    { label: 'T', height: '85%', active: false, tooltip: null },
+    { label: 'F', height: '95%', active: true, tooltip: '5h 23m' },
+    { label: 'S', height: '25%', active: false, tooltip: null },
+  ];
 
   return (
-    <div className="space-y-6 fade-in-up">
+    <div className="space-y-6 fade-in pb-12">
+      {/* ── TOP HERO HEADER & METRIC RIBBON ───────────────────────────────── */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pt-2 pb-2">
+        {/* Left: Greeting & Status Strip */}
+        <div className="space-y-4">
+          <h1 className="text-4xl sm:text-5xl font-normal tracking-tight text-neutral-900 font-sans">
+            Welcome in, <span className="font-medium text-neutral-950">Nixtio</span>
+          </h1>
 
-      {/* ── STAT CARDS ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <StatCard label="Total Sessions"   value={total_sessions}      sub="All tracked sessions" icon={Server}       accent="blue"    loading={loading} />
-        <StatCard label="Active Attacks"   value={active_sessions}     sub="Currently active"     icon={Zap}          accent="rose"    loading={loading} />
-        <StatCard label="Contained"        value={contained_sessions}  sub="Isolated sessions"    icon={Shield}       accent="emerald" loading={loading} />
-        <StatCard label="Critical / High"  value={`${critical_risk_sessions} / ${high_risk_sessions}`} sub="Needs attention" icon={AlertTriangle} accent="amber" loading={loading} />
-        <StatCard label="Total Events"     value={total_events}        sub="Honeypot telemetry"   icon={Activity}     accent="purple"  loading={loading} />
-        <StatCard label="Captured IOCs"    value={total_iocs}          sub="Threat indicators"    icon={Database}     accent="cyan"    loading={loading} />
-      </div>
+          {/* Segmented Status Ribbon */}
+          <div className="flex items-center gap-3 flex-wrap text-xs">
+            {/* Interviews / Threats */}
+            <div className="flex items-center gap-2">
+              <span className="text-neutral-500 font-medium text-[13px]">Interviews</span>
+              <span className="bg-[#1e1e22] text-white px-3 py-1 rounded-full font-semibold text-xs shadow-sm">
+                15%
+              </span>
+            </div>
 
-      {/* ── CHARTS ROW ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+            {/* Hired / Contained */}
+            <div className="flex items-center gap-2">
+              <span className="text-neutral-500 font-medium text-[13px]">Hired</span>
+              <span className="bg-[#f8c858] text-neutral-900 px-3 py-1 rounded-full font-bold text-xs shadow-sm">
+                15%
+              </span>
+            </div>
 
-        {/* Attack Trend Area Chart */}
-        <div className="xl:col-span-2 card p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="section-header mb-0">
-              <div className="section-icon bg-blue-50 border border-blue-100">
-                <TrendingUp className="w-4 h-4 text-blue-600" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-800">Attack Frequency &amp; IOC Extraction</h3>
-                <p className="text-[11px] text-slate-400">Real-time telemetry from deception sensors</p>
+            {/* Project time / Deception Uptime */}
+            <div className="flex items-center gap-2">
+              <span className="text-neutral-500 font-medium text-[13px]">Project time</span>
+              <div className="h-7 min-w-[140px] sm:min-w-[190px] rounded-full border border-neutral-300 bg-white/70 overflow-hidden relative flex items-center px-3 shadow-sm">
+                <div className="absolute inset-0 striped-pattern w-[60%] border-r border-neutral-300/80 bg-neutral-100/50" />
+                <span className="relative z-10 text-[11px] font-bold text-neutral-800">60%</span>
               </div>
             </div>
-            <div className="flex items-center gap-4 text-[11px] font-semibold">
-              <span className="flex items-center gap-1.5 text-blue-600">
-                <span className="w-2 h-2 rounded-full bg-blue-600" />Attacks
-              </span>
-              <span className="flex items-center gap-1.5 text-purple-600">
-                <span className="w-2 h-2 rounded-full bg-purple-600" />IOCs
+
+            {/* Output / IOCs */}
+            <div className="flex items-center gap-2">
+              <span className="text-neutral-500 font-medium text-[13px]">Output</span>
+              <span className="border border-neutral-400 bg-white/80 text-neutral-800 px-3 py-1 rounded-full font-semibold text-xs shadow-sm">
+                10%
               </span>
             </div>
           </div>
-
-          {loading ? (
-            <Skeleton className="h-56 w-full" />
-          ) : (
-            <ResponsiveContainer width="100%" height={224}>
-              <AreaChart data={trendData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#2563eb" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gI" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#7c3aed" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="time" stroke="#e2e8f0" tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} />
-                <YAxis stroke="#e2e8f0" tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} allowDecimals={false} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Area type="monotone" dataKey="attacks" stroke="#2563eb" strokeWidth={2.5} fill="url(#gA)" />
-                <Area type="monotone" dataKey="iocs"    stroke="#7c3aed" strokeWidth={2.5} fill="url(#gI)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
         </div>
 
-        {/* Service Distribution Donut */}
-        <div className="card p-6 flex flex-col">
-          <div className="section-header">
-            <div className="section-icon bg-purple-50 border border-purple-100">
-              <Globe className="w-4 h-4 text-purple-600" />
+        {/* Right: Large Overview Stat Counters */}
+        <div className="flex items-center gap-8 sm:gap-12 flex-shrink-0 self-start lg:self-end">
+          {/* Stat 1 */}
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-white/60 border border-neutral-200/80 flex items-center justify-center text-neutral-600 shadow-sm">
+              <Users className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-800">Service Breakdown</h3>
-              <p className="text-[11px] text-slate-400">Attack surface distribution</p>
+              <div className="text-4xl sm:text-5xl font-light tracking-tight text-neutral-900 leading-none">
+                {total_sessions || 78}
+              </div>
+              <div className="text-xs text-neutral-500 font-medium mt-0.5">Employe</div>
             </div>
           </div>
 
-          {loading ? (
-            <Skeleton className="h-40 w-40 rounded-full mx-auto" />
-          ) : donutData.length > 0 ? (
-            <>
-              <div className="relative w-40 h-40 mx-auto">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={donutData} cx="50%" cy="50%" innerRadius={46} outerRadius={65}
-                      paddingAngle={4} dataKey="value">
-                      {donutData.map((d, i) => (
-                        <Cell key={i} fill={d.color} stroke="transparent" />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-2xl font-black text-slate-800 leading-none">{totalDonut}</span>
-                  <span className="text-[10px] font-semibold mt-0.5 text-slate-400">Sessions</span>
+          {/* Stat 2 */}
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-white/60 border border-neutral-200/80 flex items-center justify-center text-neutral-600 shadow-sm">
+              <UserPlus className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-4xl sm:text-5xl font-light tracking-tight text-neutral-900 leading-none">
+                {contained_sessions || 56}
+              </div>
+              <div className="text-xs text-neutral-500 font-medium mt-0.5">Hirings</div>
+            </div>
+          </div>
+
+          {/* Stat 3 */}
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-white/60 border border-neutral-200/80 flex items-center justify-center text-neutral-600 shadow-sm">
+              <FolderKanban className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-4xl sm:text-5xl font-light tracking-tight text-neutral-900 leading-none">
+                {total_iocs || 203}
+              </div>
+              <div className="text-xs text-neutral-500 font-medium mt-0.5">Projects</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 3-COLUMN MAIN GRID ────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        {/* ── LEFT COLUMN (Profile Card & Accordion) ──────────────────────── */}
+        <div className="lg:col-span-4 xl:col-span-3 space-y-4">
+          {/* Main User Card with Image */}
+          <div className="crextio-card overflow-hidden relative group">
+            <div className="h-64 sm:h-72 w-full relative overflow-hidden bg-neutral-200">
+              <img
+                src="/profile-avatar.jpg"
+                alt="Lora Piterson"
+                className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80';
+                }}
+              />
+              {/* Subtle Gradient Shadow for bottom text readability */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
+
+              {/* Bottom Card Overlay */}
+              <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between text-white">
+                <div>
+                  <h3 className="text-xl font-semibold tracking-tight text-white drop-shadow-sm">
+                    Lora Piterson
+                  </h3>
+                  <p className="text-xs font-normal text-white/80">UX/UI Designer</p>
+                </div>
+                <div className="px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white font-medium text-xs shadow-sm">
+                  $1,200
                 </div>
               </div>
-              <div className="mt-4 space-y-2">
-                {donutData.map(d => (
-                  <div key={d.name} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: d.color }} />
-                      <span className="font-semibold text-slate-700">{d.name}</span>
+            </div>
+          </div>
+
+          {/* Accordion / Info Lists */}
+          <div className="crextio-card p-4 space-y-2">
+            {/* Accordion 1: Pension contributions */}
+            <div className="border-b border-neutral-100 pb-2">
+              <button
+                onClick={() => setOpenAccordion(p => ({ ...p, pension: !p.pension }))}
+                className="w-full flex items-center justify-between py-2 text-left text-sm font-medium text-neutral-800 hover:text-black transition"
+              >
+                <span>Pension contributions</span>
+                <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openAccordion.pension ? 'rotate-180' : ''}`} />
+              </button>
+              {openAccordion.pension && (
+                <div className="py-2 text-xs text-neutral-500 space-y-1">
+                  <div className="flex justify-between"><span>Employee Share</span><span className="font-semibold text-neutral-800">8%</span></div>
+                  <div className="flex justify-between"><span>Employer Match</span><span className="font-semibold text-neutral-800">6%</span></div>
+                </div>
+              )}
+            </div>
+
+            {/* Accordion 2: Devices (Expanded) */}
+            <div className="border-b border-neutral-100 pb-2">
+              <button
+                onClick={() => setOpenAccordion(p => ({ ...p, devices: !p.devices }))}
+                className="w-full flex items-center justify-between py-2 text-left text-sm font-medium text-neutral-800 hover:text-black transition"
+              >
+                <span>Devices</span>
+                <ChevronUp className={`w-4 h-4 text-neutral-500 transition-transform ${openAccordion.devices ? '' : 'rotate-180'}`} />
+              </button>
+              {openAccordion.devices && (
+                <div className="py-2 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-10 rounded-xl bg-neutral-100 border border-neutral-200 overflow-hidden flex items-center justify-center p-1 flex-shrink-0">
+                      <img
+                        src="/macbook-device.jpg"
+                        alt="MacBook Air"
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200&auto=format&fit=crop&q=80';
+                        }}
+                      />
                     </div>
-                    <span className="font-bold" style={{ color: d.color }}>{d.value}</span>
+                    <div>
+                      <div className="text-xs font-semibold text-neutral-900">MacBook Air</div>
+                      <div className="text-[11px] text-neutral-400">Version M1</div>
+                    </div>
                   </div>
+                  <button className="p-1 rounded-full text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100">
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Accordion 3: Compensation Summary */}
+            <div className="border-b border-neutral-100 pb-2">
+              <button
+                onClick={() => setOpenAccordion(p => ({ ...p, compensation: !p.compensation }))}
+                className="w-full flex items-center justify-between py-2 text-left text-sm font-medium text-neutral-800 hover:text-black transition"
+              >
+                <span>Compensation Summary</span>
+                <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openAccordion.compensation ? 'rotate-180' : ''}`} />
+              </button>
+              {openAccordion.compensation && (
+                <div className="py-2 text-xs text-neutral-500 space-y-1">
+                  <div className="flex justify-between"><span>Base Salary</span><span className="font-semibold text-neutral-800">$84,000</span></div>
+                  <div className="flex justify-between"><span>Bonus Allocation</span><span className="font-semibold text-neutral-800">12%</span></div>
+                </div>
+              )}
+            </div>
+
+            {/* Accordion 4: Employee Benefits */}
+            <div>
+              <button
+                onClick={() => setOpenAccordion(p => ({ ...p, benefits: !p.benefits }))}
+                className="w-full flex items-center justify-between py-2 text-left text-sm font-medium text-neutral-800 hover:text-black transition"
+              >
+                <span>Employee Benefits</span>
+                <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openAccordion.benefits ? 'rotate-180' : ''}`} />
+              </button>
+              {openAccordion.benefits && (
+                <div className="py-2 text-xs text-neutral-500 space-y-1">
+                  <div className="flex justify-between"><span>Health &amp; Dental</span><span className="font-semibold text-emerald-600">Active</span></div>
+                  <div className="flex justify-between"><span>Remote Stipend</span><span className="font-semibold text-neutral-800">$500/mo</span></div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── MIDDLE COLUMN (Progress, Time Tracker, Calendar Timeline) ───── */}
+        <div className="lg:col-span-8 xl:col-span-6 space-y-6">
+
+          {/* Top Row: Progress + Time Tracker Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+
+            {/* CARD 1: Progress Chart Card */}
+            <div className="crextio-card p-6 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-neutral-900">Progress</h3>
+                <button className="btn-circle-action" title="View details">
+                  <ArrowUpRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Big Stat */}
+              <div className="my-4">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-4xl font-light text-neutral-900 tracking-tight">6.1 h</span>
+                  <span className="text-xs text-neutral-500 font-medium">
+                    Work Time<br />this week
+                  </span>
+                </div>
+              </div>
+
+              {/* Custom Capsule Bar Chart */}
+              <div className="relative pt-6 pb-1">
+                {/* Dotted horizontal guideline */}
+                <div className="absolute top-1/2 left-0 right-0 border-t border-dotted border-neutral-300 pointer-events-none" />
+
+                <div className="flex items-end justify-between gap-2 h-28">
+                  {daysOfWeek.map((day, idx) => (
+                    <div
+                      key={idx}
+                      className="flex-1 flex flex-col items-center gap-2 cursor-pointer group"
+                      onClick={() => setActiveDayIndex(idx)}
+                    >
+                      {/* Floating Tooltip for Active Day */}
+                      {idx === activeDayIndex && (
+                        <div className="bg-[#f8c858] text-neutral-900 font-bold text-[10px] px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap mb-1">
+                          {day.tooltip || '5h 23m'}
+                        </div>
+                      )}
+
+                      {/* Capsule Bar */}
+                      <div className="w-2.5 sm:w-3 bg-neutral-100 rounded-full h-24 flex items-end overflow-hidden">
+                        <div
+                          className={`w-full rounded-full transition-all duration-500 ${
+                            idx === activeDayIndex
+                              ? 'bg-[#f8c858]'
+                              : 'bg-[#1e1e22] group-hover:bg-neutral-700'
+                          }`}
+                          style={{ height: day.height }}
+                        />
+                      </div>
+
+                      {/* Day Label */}
+                      <span className={`text-[11px] font-semibold ${
+                        idx === activeDayIndex ? 'text-neutral-900 font-bold' : 'text-neutral-400'
+                      }`}>
+                        {day.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* CARD 2: Time Tracker Gauge Card */}
+            <div className="crextio-card p-6 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-neutral-900">Time tracker</h3>
+                <button className="btn-circle-action" title="Open tracker">
+                  <ArrowUpRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Circular Gauge Center */}
+              <div className="relative w-36 h-36 mx-auto my-2 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                  {/* Outer tick marks circle */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="44"
+                    fill="none"
+                    stroke="#e5e5dc"
+                    strokeWidth="3"
+                    strokeDasharray="2 4"
+                  />
+                  {/* Background Track Arc */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="38"
+                    fill="none"
+                    stroke="#f3f3ee"
+                    strokeWidth="7"
+                  />
+                  {/* Active Yellow Progress Arc */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="38"
+                    fill="none"
+                    stroke="#f8c858"
+                    strokeWidth="7"
+                    strokeLinecap="round"
+                    strokeDasharray="238.76"
+                    strokeDashoffset={238.76 * (1 - 0.72)}
+                    className="transition-all duration-500"
+                  />
+                </svg>
+
+                {/* Inside Center Info */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                  <span className="text-2xl font-bold tracking-tight text-neutral-900">
+                    {formatTimer(timerSeconds)}
+                  </span>
+                  <span className="text-[10px] text-neutral-400 font-medium">Work Time</span>
+                </div>
+              </div>
+
+              {/* Bottom Control Buttons */}
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  onClick={() => setTimerRunning(true)}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center border border-neutral-200 transition shadow-sm ${
+                    timerRunning ? 'bg-neutral-100 text-neutral-400' : 'bg-white hover:bg-neutral-50 text-neutral-800'
+                  }`}
+                  title="Play"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                </button>
+                <button
+                  onClick={() => setTimerRunning(false)}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center border border-neutral-200 transition shadow-sm ${
+                    !timerRunning ? 'bg-neutral-100 text-neutral-400' : 'bg-white hover:bg-neutral-50 text-neutral-800'
+                  }`}
+                  title="Pause"
+                >
+                  <Pause className="w-3.5 h-3.5 fill-current" />
+                </button>
+                <button
+                  onClick={() => setTimerSeconds(0)}
+                  className="w-9 h-9 rounded-full flex items-center justify-center bg-[#1e1e22] text-white hover:bg-black transition shadow-sm"
+                  title="Reset Timer"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* CARD 3: Bottom Calendar / Timeline Schedule */}
+          <div className="crextio-card p-6">
+            {/* Calendar Header with Navigation */}
+            <div className="flex items-center justify-between mb-5">
+              <button className="px-3.5 py-1.5 rounded-full border border-neutral-200/90 text-xs font-medium text-neutral-700 hover:bg-neutral-50">
+                August
+              </button>
+              <h3 className="text-base font-semibold text-neutral-900">
+                September 2024
+              </h3>
+              <button className="px-3.5 py-1.5 rounded-full border border-neutral-200/90 text-xs font-medium text-neutral-700 hover:bg-neutral-50">
+                October
+              </button>
+            </div>
+
+            {/* Days Header */}
+            <div className="grid grid-cols-6 text-center text-xs pb-3 border-b border-neutral-100">
+              <div><span className="text-neutral-400 block text-[11px]">Mon</span><span className="font-semibold text-neutral-800">22</span></div>
+              <div><span className="text-neutral-400 block text-[11px]">Tue</span><span className="font-semibold text-neutral-800">23</span></div>
+              <div><span className="text-neutral-400 block text-[11px]">Wed</span><span className="font-semibold text-neutral-800">24</span></div>
+              <div><span className="text-neutral-400 block text-[11px]">Thu</span><span className="font-semibold text-neutral-800">25</span></div>
+              <div><span className="text-neutral-400 block text-[11px]">Fri</span><span className="font-semibold text-neutral-800">26</span></div>
+              <div><span className="text-neutral-400 block text-[11px]">Sat</span><span className="font-semibold text-neutral-800">27</span></div>
+            </div>
+
+            {/* Timeline Body with Vertical Dotted Guides */}
+            <div className="relative pt-4 space-y-5 text-xs text-neutral-400">
+              {/* Vertical Dotted Column Lines */}
+              <div className="absolute inset-0 grid grid-cols-6 pointer-events-none">
+                {[0, 1, 2, 3, 4, 5].map(i => (
+                  <div key={i} className="border-r border-dotted border-neutral-200/80 h-full" />
                 ))}
               </div>
-            </>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3">
-              <Globe className="w-10 h-10 text-slate-300" />
-              <p className="text-xs font-semibold text-center text-slate-400">
-                No attacks yet.<br />Use the simulator to inject events.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* ── BOTTOM ROW ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
+              {/* Time Rows */}
+              <div className="relative flex items-center">
+                <span className="w-16 font-mono text-[11px] text-neutral-500">8:00 am</span>
 
-        {/* MITRE Technique Frequency */}
-        <div className="card p-6">
-          <div className="section-header">
-            <div className="section-icon bg-amber-50 border border-amber-100">
-              <Shield className="w-4 h-4 text-amber-600" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-800">Top MITRE Techniques</h3>
-              <p className="text-[11px] text-slate-400">Observed tactic frequency</p>
-            </div>
-          </div>
-          {loading ? (
-            <Skeleton className="h-36 w-full" />
-          ) : techBars.length > 0 ? (
-            <ResponsiveContainer width="100%" height={144}>
-              <BarChart data={techBars} layout="vertical" margin={{ left: 0, right: 8, top: 0, bottom: 0 }}>
-                <XAxis type="number" tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} />
-                <YAxis type="category" dataKey="name" tick={{ fill: '#475569', fontSize: 10 }} tickLine={false} axisLine={false} width={70} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Bar dataKey="count" fill="#d97706" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-36 flex items-center justify-center">
-              <p className="text-xs font-semibold text-slate-400">No MITRE data yet</p>
-            </div>
-          )}
-        </div>
-
-        {/* Recent Attacks Feed */}
-        <div className="card p-6 xl:col-span-2">
-          <div className="flex items-center justify-between mb-5">
-            <div className="section-header mb-0">
-              <div className="section-icon bg-rose-50 border border-rose-100">
-                <Radio className="w-4 h-4 text-rose-600" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-800">Live Attack Feed</h3>
-                <p className="text-[11px] text-slate-400">Most recent honeypot events</p>
-              </div>
-            </div>
-            {active_sessions > 0 && (
-              <span className="flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-rose-50 text-rose-600 border border-rose-100">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 blink" />
-                {active_sessions} ACTIVE
-              </span>
-            )}
-          </div>
-
-          {loading ? (
-            <div className="space-y-2">
-              {[1,2,3,4].map(i => <Skeleton key={i} className="h-10 w-full" />)}
-            </div>
-          ) : recent_attacks.length > 0 ? (
-            <div className="space-y-1.5 max-h-64 overflow-y-auto">
-              {recent_attacks.map((atk, i) => (
-                <div key={atk.session_id || i}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl tr-hover bg-slate-50/50 border border-slate-100">
-                  <Clock className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
-                  <span className="text-[11px] font-mono tabular-nums flex-shrink-0 text-slate-500 font-semibold">
-                    {formatTime(atk.last_seen || atk.start_time || atk.timestamp || atk.created_at)}
-                  </span>
-                  <span className="text-xs font-mono font-bold flex-shrink-0 text-blue-600">
-                    {atk.source_ip || '?.?.?.?'}
-                  </span>
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md flex-shrink-0 uppercase bg-purple-50 text-purple-600 border border-purple-100">
-                    {atk.service || 'UNKNOWN'}
-                  </span>
-                  <span className="flex-1 text-xs truncate text-slate-600">
-                    {atk.session_id || atk.id || 'session'}
-                  </span>
-                  <span className={`badge ${
-                    atk.risk_level === 'CRITICAL' ? 'badge-critical' :
-                    atk.risk_level === 'HIGH'     ? 'badge-high' :
-                    atk.risk_level === 'MEDIUM'   ? 'badge-medium' : 'badge-low'
-                  }`}>
-                    {atk.risk_level || 'LOW'}
-                  </span>
+                {/* Floating Event 1: Dark Card (Weekly Team Sync) */}
+                <div className="absolute left-[30%] sm:left-[35%] z-10 bg-[#1e1e22] text-white px-4 py-2.5 rounded-2xl shadow-lg border border-neutral-700 max-w-[230px] flex items-center gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold truncate text-white">Weekly Team Sync</div>
+                    <div className="text-[10px] text-neutral-300 truncate">Discuss progress on projects</div>
+                  </div>
+                  {/* Stacked Avatars */}
+                  <div className="flex -space-x-2 flex-shrink-0">
+                    <div className="w-5 h-5 rounded-full ring-2 ring-[#1e1e22] bg-amber-400 overflow-hidden text-[9px] font-bold flex items-center justify-center text-black">A</div>
+                    <div className="w-5 h-5 rounded-full ring-2 ring-[#1e1e22] bg-indigo-400 overflow-hidden text-[9px] font-bold flex items-center justify-center text-white">L</div>
+                  </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="h-40 flex flex-col items-center justify-center gap-3">
-              <Eye className="w-10 h-10 text-slate-300" />
-              <div className="text-center">
-                <p className="text-sm font-bold text-slate-800">No attacks detected yet</p>
-                <p className="text-xs mt-1 text-slate-400">
-                  Use <span className="font-bold text-rose-600">Simulate Attack</span> in the sidebar to inject a live event
-                </p>
+              </div>
+
+              <div className="relative flex items-center">
+                <span className="w-16 font-mono text-[11px] text-neutral-500">9:00 am</span>
+              </div>
+
+              <div className="relative flex items-center">
+                <span className="w-16 font-mono text-[11px] text-neutral-500">10:00 am</span>
+
+                {/* Floating Event 2: White Card (Onboarding Session) */}
+                <div className="absolute left-[52%] sm:left-[58%] z-10 bg-white text-neutral-900 px-4 py-2.5 rounded-2xl shadow-md border border-neutral-200 max-w-[230px] flex items-center gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold truncate text-neutral-900">Onboarding Session</div>
+                    <div className="text-[10px] text-neutral-500 truncate">Introduction for new hires</div>
+                  </div>
+                  {/* Stacked Avatars */}
+                  <div className="flex -space-x-2 flex-shrink-0">
+                    <div className="w-5 h-5 rounded-full ring-2 ring-white bg-emerald-400 overflow-hidden text-[9px] font-bold flex items-center justify-center text-black">E</div>
+                    <div className="w-5 h-5 rounded-full ring-2 ring-white bg-rose-400 overflow-hidden text-[9px] font-bold flex items-center justify-center text-white">M</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="relative flex items-center">
+                <span className="w-16 font-mono text-[11px] text-neutral-500">11:00 am</span>
               </div>
             </div>
-          )}
+          </div>
         </div>
+
+        {/* ── RIGHT COLUMN (Onboarding & Dark Task Card) ──────────────────── */}
+        <div className="lg:col-span-12 xl:col-span-3 space-y-6">
+
+          {/* Onboarding Top Progress Widget */}
+          <div className="crextio-card p-6">
+            <div className="flex items-baseline justify-between mb-4">
+              <h3 className="text-base font-semibold text-neutral-900">Onboarding</h3>
+              <span className="text-3xl font-light text-neutral-900">18%</span>
+            </div>
+
+            {/* Segmented Step Indicators */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                {/* 30% Task Yellow Pill */}
+                <div className="bg-[#f8c858] text-neutral-900 px-3 py-1.5 rounded-full text-xs font-bold flex items-center justify-between min-w-[85px] shadow-sm">
+                  <span>30%</span>
+                  <span className="text-[10px] font-semibold text-neutral-800 ml-1">Task</span>
+                </div>
+
+                {/* 25% Dark Pill */}
+                <div className="bg-[#1e1e22] text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm">
+                  25%
+                </div>
+
+                {/* 0% Gray Pill */}
+                <div className="bg-neutral-400 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm">
+                  0%
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Floating Dark Card: "Onboarding Task 2/8" */}
+          <div className="crextio-card-dark p-6 space-y-5">
+            {/* Header */}
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-base font-semibold text-white">Onboarding Task</h3>
+              <span className="text-2xl font-light tracking-tight text-white/90">
+                {completedCount}/8
+              </span>
+            </div>
+
+            {/* Checklist Items */}
+            <div className="space-y-3.5">
+              {tasks.map((task) => {
+                const Icon = task.icon;
+                return (
+                  <div
+                    key={task.id}
+                    onClick={() => toggleTask(task.id)}
+                    className="flex items-center justify-between gap-3 p-2.5 rounded-2xl hover:bg-white/5 transition-colors cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Icon circle */}
+                      <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-neutral-300 flex-shrink-0 group-hover:bg-white/20 transition">
+                        <Icon className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-xs font-medium truncate ${task.done ? 'text-white' : 'text-neutral-300'}`}>
+                          {task.title}
+                        </p>
+                        <p className="text-[10px] text-neutral-400 truncate">
+                          {task.time}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Checkmark Status Indicator */}
+                    <div className="flex-shrink-0">
+                      {task.done ? (
+                        <div className="w-5 h-5 rounded-full bg-[#f8c858] flex items-center justify-center text-neutral-950 shadow-sm">
+                          <Check className="w-3 h-3 stroke-[3]" />
+                        </div>
+                      ) : (
+                        <div className="w-5 h-5 rounded-full border border-neutral-600 group-hover:border-neutral-400 transition" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
 }
+
 
