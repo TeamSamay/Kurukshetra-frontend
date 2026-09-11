@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import {
   ShieldAlert, Clock, Lock, Activity, Terminal, Copy, Check,
   AlertTriangle, ChevronDown, ChevronUp, TrendingUp,
-  Cpu, CheckCircle2, Sparkles, Zap, Flame,
-  Shield, Crosshair, Code2, PlayCircle, Layers, Radio, CheckCheck
+  Cpu, CheckCircle2, Sparkles, Zap, Shield, CheckCheck
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer
@@ -13,16 +12,16 @@ import { explainEventWithAI } from '../services/api';
 function riskBadge(risk) {
   const r = (risk || '').toUpperCase();
   const map = {
-    CRITICAL: 'bg-rose-100 text-rose-700 border-rose-300',
-    HIGH: 'bg-amber-100 text-amber-800 border-amber-300',
-    MEDIUM: 'bg-blue-100 text-blue-700 border-blue-300',
-    LOW: 'bg-emerald-100 text-emerald-700 border-emerald-300',
-    INFO: 'bg-slate-100 text-slate-700 border-slate-300'
+    CRITICAL: 'badge-critical',
+    HIGH: 'badge-high',
+    MEDIUM: 'badge-medium',
+    LOW: 'badge-low',
+    INFO: 'badge-info'
   };
-  return map[r] || 'bg-slate-100 text-slate-700 border-slate-300';
+  return map[r] || 'badge-low';
 }
 
-function CopyBtn({ text, label }) {
+function CopyBtn({ text }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     await navigator.clipboard.writeText(text).catch(() => {});
@@ -30,22 +29,9 @@ function CopyBtn({ text, label }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <button
-      onClick={copy}
-      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all border border-slate-200 cursor-pointer"
-      title="Copy to clipboard"
-    >
-      {copied ? (
-        <>
-          <CheckCheck className="w-3 h-3 text-emerald-600" />
-          <span className="text-emerald-700 font-bold">{label ? `${label} Copied!` : 'Copied!'}</span>
-        </>
-      ) : (
-        <>
-          <Copy className="w-3 h-3 text-slate-500" />
-          {label && <span>{label}</span>}
-        </>
-      )}
+    <button onClick={copy} className="btn-ghost p-1" title="Copy to clipboard">
+      {copied ? <Check className="w-3 h-3 text-emerald-600" />
+               : <Copy className="w-3 h-3 text-slate-400" />}
     </button>
   );
 }
@@ -63,56 +49,6 @@ function buildRiskTimeline(events) {
     .map((e, i) => ({ t: i + 1, risk: e.risk_score ?? ((i + 1) * 15) }));
 }
 
-function deriveAttackerPersona(service, events = [], riskScore = 0) {
-  const s = (service || '').toLowerCase();
-  const evtCount = events.length;
-
-  if (s === 'ssh' || s === 'telnet') {
-    if (evtCount > 5 || riskScore >= 75) {
-      return {
-        type: 'Targeted Shell Operator (Manual / APT)',
-        icon: Crosshair,
-        tagBg: 'bg-rose-100 text-rose-800 border-rose-200',
-        barColor: 'bg-rose-500',
-        sophistication: 'High (Interactive TTY Shell)',
-        intent: 'Credential harvesting, lateral traversal & persistence attempt',
-        evasion: 'Dynamic proxying & target validation'
-      };
-    }
-    return {
-      type: 'Brute-Force Credential Bot',
-      icon: Radio,
-      tagBg: 'bg-amber-100 text-amber-800 border-amber-200',
-      barColor: 'bg-amber-500',
-      sophistication: 'Moderate (Wordlist spraying)',
-      intent: 'Automated SSH daemon credential stuffing',
-      evasion: 'Rapid randomized source port rotation'
-    };
-  }
-
-  if (s === 'web' || s === 'http') {
-    return {
-      type: 'Web Application Vulnerability Scanner',
-      icon: Flame,
-      tagBg: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-      barColor: 'bg-indigo-500',
-      sophistication: 'Moderate (Automated exploit fuzzing)',
-      intent: 'Directory traversal, config leakage & API backdoor discovery',
-      evasion: 'User-agent spoofing & fuzzing headers'
-    };
-  }
-
-  return {
-    type: 'Automated Internet Recon Crawler',
-    icon: Radio,
-    tagBg: 'bg-blue-100 text-blue-800 border-blue-200',
-    barColor: 'bg-blue-500',
-    sophistication: 'Low (Shodan / Masscan style probe)',
-    intent: 'Port mapping and open daemon banner grabbing',
-    evasion: 'Standard SYN sweep'
-  };
-}
-
 const TOOLTIP_STYLE = {
   background: '#ffffff', border: '1px solid #e2e8f0',
   borderRadius: 10, fontSize: 12, color: '#0f172a',
@@ -123,8 +59,7 @@ export default function AttackInvestigation({ sessionData, onContainSession }) {
   const [expandedEvent, setExpandedEvent] = useState(null);
   const [eventExplanations, setEventExplanations] = useState({});
   const [explainingEventId, setExplainingEventId] = useState(null);
-  const [activeTab, setActiveTab] = useState('intelligence'); // 'intelligence' | 'playbook' | 'timeline'
-  const [ruleFormat, setRuleFormat] = useState('ufw'); // 'ufw' | 'iptables' | 'snort'
+  const [copiedRule, setCopiedRule] = useState(false);
 
   if (!sessionData) {
     return (
@@ -134,7 +69,7 @@ export default function AttackInvestigation({ sessionData, onContainSession }) {
           <h2 className="text-xl font-black text-slate-800">No Session Selected</h2>
           <p className="text-sm mt-2 text-slate-400">
             Go to <span className="font-bold text-sky-600">Live Attacks</span> and click{' '}
-            <span className="font-bold text-blue-600">Investigate</span> on any active session.
+            <span className="font-bold text-blue-600">Investigate</span> on any session.
           </p>
         </div>
       </div>
@@ -142,7 +77,7 @@ export default function AttackInvestigation({ sessionData, onContainSession }) {
   }
 
   const {
-    session_id, source_ip = '127.0.0.1', service = 'ssh', status, risk_level = 'LOW',
+    session_id, source_ip, service, status, risk_level,
     risk_score = 0, attacker_dna, fingerprint, events = [], iocs = [],
     created_at, updated_at, start_time, last_seen, ai_analysis
   } = sessionData;
@@ -152,13 +87,14 @@ export default function AttackInvestigation({ sessionData, onContainSession }) {
   const displayLastSeen = last_seen || updated_at;
   const isContained = (status || '').toUpperCase() === 'CONTAINED';
   const riskTimelineData = buildRiskTimeline(events);
-  const persona = deriveAttackerPersona(service, events, risk_score);
-  const PersonaIcon = persona.icon;
 
-  // Active Defense commands
-  const ufwCmd = `sudo ufw deny from ${source_ip} to any comment 'Kurukshetra Deception Trap Block'`;
-  const iptablesCmd = `sudo iptables -I INPUT -s ${source_ip} -j DROP -m comment --comment 'Kurukshetra Trap'`;
-  const snortRule = `alert tcp ${source_ip} any -> $HOME_NET any (msg:"KURUKSHETRA-DECEPTION Hostile IP Detected"; sid:1009021; rev:1;)`;
+  const firewallCommand = `sudo ufw deny from ${source_ip || '0.0.0.0'} to any comment 'Kurukshetra Honeypot Block'`;
+
+  const copyFirewallRule = async () => {
+    await navigator.clipboard.writeText(firewallCommand).catch(() => {});
+    setCopiedRule(true);
+    setTimeout(() => setCopiedRule(false), 2500);
+  };
 
   async function handleExplainEvent(ev, idx) {
     const key = ev.event_id || idx;
@@ -186,562 +122,329 @@ export default function AttackInvestigation({ sessionData, onContainSession }) {
   }
 
   return (
-    <div className="space-y-6 fade-in-up">
+    <div className="space-y-5 fade-in-up">
 
-      {/* TOP HERO INVESTIGATION BANNER */}
-      <div className="card p-6 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white border-none shadow-xl relative overflow-hidden">
-        {/* Glow backdrop accent */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-wrap items-start justify-between gap-5">
+      {/* Header Card */}
+      <div className="card p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 bg-blue-500/20 border border-blue-400/30 text-blue-400 backdrop-blur-md">
-              <ShieldAlert className="w-7 h-7" />
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-rose-50 border border-rose-100">
+              <ShieldAlert className="w-6 h-6 text-rose-600" />
             </div>
             <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="text-xs font-mono tracking-widest text-blue-300 uppercase font-bold">
-                  CYBER DECEPTION FORENSICS STUDIO
-                </span>
-                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${riskBadge(risk_level)}`}>
-                  {risk_level} SEVERITY
-                </span>
-                {isContained && (
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                    ISOLATED & CONTAINED
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-black text-slate-800">AI Attacker Forensics Studio</h2>
+                <span className={`badge ${riskBadge(risk_level)}`}>{risk_level || 'LOW'}</span>
+                {isContained && <span className="badge badge-contained">CONTAINED</span>}
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="font-mono text-sm font-bold text-blue-600">{source_ip || '?.?.?.?'}</span>
+                <CopyBtn text={source_ip || ''} />
+                <span className="text-xs text-slate-400">→</span>
+                <span className="badge badge-info text-[10px]">{(service || '').toUpperCase()} HONEYPOT</span>
+              </div>
+              <p className="text-xs font-mono mt-1 text-slate-400">{session_id}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Risk Gauge */}
+            <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-slate-50 border border-slate-100">
+              <div>
+                <p className="text-[10px] font-bold tracking-widest uppercase text-slate-400">Risk Score</p>
+                <p className="text-2xl font-black mt-0.5" style={{
+                  color: risk_score >= 80 ? '#e11d48' : risk_score >= 50 ? '#d97706' : '#2563eb'
+                }}>{risk_score}</p>
+              </div>
+              <svg width="48" height="48" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="18" fill="none" stroke="#e2e8f0" strokeWidth="4" />
+                <circle cx="24" cy="24" r="18" fill="none"
+                  stroke={risk_score >= 80 ? '#e11d48' : risk_score >= 50 ? '#d97706' : '#2563eb'}
+                  strokeWidth="4" strokeLinecap="round"
+                  strokeDasharray={`${(risk_score / 100) * 113} 113`}
+                  transform="rotate(-90 24 24)" />
+                <text x="24" y="28" textAnchor="middle" fontSize="10" fill="#94a3b8" fontFamily="JetBrains Mono">
+                  /100
+                </text>
+              </svg>
+            </div>
+
+            {!isContained && onContainSession && (
+              <button onClick={() => onContainSession(session_id)} className="btn-danger">
+                <Lock className="w-4 h-4" /> Contain Session
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Attacker DNA */}
+        {displayFingerprint && (
+          <div className="mt-4 px-4 py-2.5 rounded-xl flex items-center justify-between flex-wrap gap-3 bg-purple-50/70 border border-purple-100">
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-bold tracking-widest uppercase text-purple-600">ATTACKER DNA</span>
+              <span className="font-mono font-bold text-purple-700">{displayFingerprint}</span>
+              <CopyBtn text={displayFingerprint} />
+            </div>
+            <span className="text-[11px] text-purple-600 font-medium">Evidence-based behavioral fingerprint</span>
+          </div>
+        )}
+      </div>
+
+      {/* STRUCTURED AI THREAT ANALYST PANEL (Clean Theme) */}
+      {ai_analysis && (
+        <div className="card p-6">
+          <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-blue-50 border border-blue-200">
+                <Cpu className="w-4 h-4 text-blue-600" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-800">AI Threat Analyst Intelligence</h3>
+                  <span className="badge badge-info text-[10px]">
+                    Kurukshetra Cyber Threat Intelligence Engine
                   </span>
+                </div>
+                <p className="text-[11px] text-slate-400">Structured telemetry reasoning & objective analysis</p>
+              </div>
+            </div>
+
+            {/* 1-Click Action Button */}
+            <button
+              onClick={copyFirewallRule}
+              className="btn-ghost text-xs flex items-center gap-1.5 border border-slate-200 bg-slate-50 hover:bg-slate-100"
+              title="Copy UFW Firewall block rule for this attacker IP"
+            >
+              {copiedRule ? (
+                <>
+                  <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-emerald-700 font-bold">UFW Block Rule Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Shield className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Copy Firewall Ban Rule</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {/* Threat Summary */}
+            <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Threat Summary</p>
+              <p className="text-xs text-slate-700 mt-1 leading-relaxed">
+                {ai_analysis.threat_summary || ai_analysis.summary}
+              </p>
+            </div>
+
+            {/* Observed Behavior vs AI Interpretation */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-2">
+                  ✓ Observed Behavior (Verifiable Telemetry)
+                </p>
+                {Array.isArray(ai_analysis.observed_behavior) && ai_analysis.observed_behavior.length > 0 ? (
+                  <ul className="space-y-1.5 text-xs text-slate-700">
+                    {ai_analysis.observed_behavior.map((obs, idx) => (
+                      <li key={idx} className="flex items-start gap-1.5">
+                        <span className="text-blue-600 font-bold">•</span>
+                        <span>{obs}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-slate-600">{ai_analysis.observed_behavior_explanation || 'Interactions recorded across honeypot sensors.'}</p>
                 )}
               </div>
 
-              <div className="flex items-center gap-3 mt-2 flex-wrap">
-                <h1 className="text-2xl font-black font-mono tracking-tight text-white">{source_ip}</h1>
-                <CopyBtn text={source_ip} />
-                <span className="text-slate-400 font-mono text-sm">→</span>
-                <span className="px-3 py-1 rounded-xl text-xs font-bold bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 uppercase tracking-wide">
-                  {service} Decoy Trap
-                </span>
-              </div>
-
-              <p className="text-xs font-mono text-slate-400 mt-2">
-                Session ID: <span className="text-slate-200">{session_id}</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Risk Gauge & Actions */}
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="px-5 py-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 text-center">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-slate-300">Threat Threat Index</p>
-              <div className="flex items-baseline justify-center gap-1 mt-0.5">
-                <span className="text-3xl font-black" style={{
-                  color: risk_score >= 80 ? '#fb7185' : risk_score >= 50 ? '#fbbf24' : '#60a5fa'
-                }}>{risk_score}</span>
-                <span className="text-xs font-mono text-slate-400">/100</span>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              {!isContained && (
-                <button
-                  onClick={() => onContainSession(session_id)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white flex items-center gap-2 shadow-lg shadow-rose-900/30 transition-all cursor-pointer"
-                >
-                  <Lock className="w-4 h-4" /> Contain Adversary
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ATTACKER BEHAVIORAL PERSONA CARD */}
-        <div className="mt-6 pt-5 border-t border-white/10 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0 text-blue-400">
-              <PersonaIcon className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Attacker Archetype</p>
-              <p className="text-xs font-bold text-white mt-0.5">{persona.type}</p>
-              <span className="text-[11px] text-blue-300 font-medium">{persona.sophistication}</span>
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center flex-shrink-0 text-indigo-400">
-              <Layers className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Deception Containment Status</p>
-              <p className="text-xs font-bold text-emerald-400 mt-0.5">0% Production Leakage</p>
-              <span className="text-[11px] text-slate-300">Trapped inside Kurukshetra Decoy</span>
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0 text-purple-400">
-              <Terminal className="w-4 h-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Attacker DNA Fingerprint</p>
-              <p className="text-xs font-mono font-bold text-purple-300 truncate mt-0.5" title={displayFingerprint}>
-                {displayFingerprint || 'FPR-GENERIC-AGENT'}
-              </p>
-              <span className="text-[11px] text-slate-300">Behavioral keystroke & tool signature</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 4-STAGE CYBER DECEPTION KILL-CHAIN FLOW */}
-      <div className="card p-5 bg-white border border-slate-200">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-            <Activity className="w-4 h-4 text-blue-600" />
-            Deception Trap Progression & Adversary Kill-Chain
-          </h3>
-          <span className="text-[11px] font-mono text-slate-400">{events.length} Telemetry Events</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Step 1 */}
-          <div className="p-3 rounded-xl bg-blue-50/60 border border-blue-100 flex items-center gap-3">
-            <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center flex-shrink-0">
-              1
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-800">Decoy Reconnaissance</p>
-              <p className="text-[11px] text-slate-500">Port probe & banner grab</p>
-            </div>
-          </div>
-
-          {/* Step 2 */}
-          <div className="p-3 rounded-xl bg-indigo-50/60 border border-indigo-100 flex items-center gap-3">
-            <div className="w-7 h-7 rounded-full bg-indigo-600 text-white font-black text-xs flex items-center justify-center flex-shrink-0">
-              2
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-800">Lure Engagement</p>
-              <p className="text-[11px] text-slate-500">Decoy service ingress</p>
-            </div>
-          </div>
-
-          {/* Step 3 */}
-          <div className={`p-3 rounded-xl border flex items-center gap-3 ${
-            events.length > 2 ? 'bg-amber-50/70 border-amber-200' : 'bg-slate-50 border-slate-100 opacity-60'
-          }`}>
-            <div className={`w-7 h-7 rounded-full font-black text-xs flex items-center justify-center flex-shrink-0 ${
-              events.length > 2 ? 'bg-amber-500 text-white' : 'bg-slate-300 text-slate-700'
-            }`}>
-              3
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-800">Decoy Interaction</p>
-              <p className="text-[11px] text-slate-500">Probing fake tokens & paths</p>
-            </div>
-          </div>
-
-          {/* Step 4 */}
-          <div className={`p-3 rounded-xl border flex items-center gap-3 ${
-            isContained ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'
-          }`}>
-            <div className={`w-7 h-7 rounded-full font-black text-xs flex items-center justify-center flex-shrink-0 ${
-              isContained ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
-            }`}>
-              4
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-800">
-                {isContained ? 'Threat Contained' : 'Active Trap Monitoring'}
-              </p>
-              <p className="text-[11px] text-slate-500">
-                {isContained ? 'Decoy isolated' : 'Live telemetry stream'}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* NAVIGATION TABS FOR DEEP INVESTIGATION */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-1">
-        <button
-          onClick={() => setActiveTab('intelligence')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
-            activeTab === 'intelligence'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Cpu className="w-3.5 h-3.5" />
-          AI Threat Intelligence & Hypothesis
-        </button>
-
-        <button
-          onClick={() => setActiveTab('playbook')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
-            activeTab === 'playbook'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Shield className="w-3.5 h-3.5" />
-          1-Click Active Defense Playbook
-        </button>
-
-        <button
-          onClick={() => setActiveTab('timeline')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
-            activeTab === 'timeline'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Terminal className="w-3.5 h-3.5" />
-          Forensic Attack Telemetry ({events.length})
-        </button>
-      </div>
-
-      {/* TAB 1: AI THREAT INTELLIGENCE & REASONING */}
-      {activeTab === 'intelligence' && (
-        <div className="space-y-5">
-          {ai_analysis ? (
-            <div className="card p-6 bg-white border border-slate-200 shadow-sm space-y-5">
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
-                    <Sparkles className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-slate-900">Cognitive Cyber Threat Reasoning Engine</h3>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-100 text-blue-700">
-                        {ai_analysis.model_used || 'Groq Llama-3.3-70B'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      Telemetry-grounded reasoning with zero-hallucination verification
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Telemetry Fact-Checked
-                </div>
-              </div>
-
-              {/* Threat Summary Box */}
-              <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50/70 to-indigo-50/50 border border-blue-100">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-1">
-                  Adversary Executive Brief
+              <div className="p-3.5 rounded-xl bg-purple-50/50 border border-purple-100">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-purple-700 mb-2">
+                  🧠 AI Interpretation (Intent & Threat Modeling)
                 </p>
-                <p className="text-xs leading-relaxed text-slate-800 font-medium">
-                  {ai_analysis.threat_summary || ai_analysis.summary}
+                {Array.isArray(ai_analysis.ai_interpretation) && ai_analysis.ai_interpretation.length > 0 ? (
+                  <ul className="space-y-1.5 text-xs text-slate-700">
+                    {ai_analysis.ai_interpretation.map((interp, idx) => (
+                      <li key={idx} className="flex items-start gap-1.5">
+                        <span className="text-purple-600 font-bold">•</span>
+                        <span>{interp}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-slate-600">Likely intent: {ai_analysis.likely_objective || 'Reconnaissance and service probing.'}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Recommended Defensive Actions */}
+            {ai_analysis.recommended_actions && (
+              <div className="p-3.5 rounded-xl bg-emerald-50/50 border border-emerald-100">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 mb-1.5">
+                  🛡️ Human-Reviewed Defensive Recommendations
                 </p>
-              </div>
-
-              {/* DUAL COMPARISON: Ground Truth Facts vs AI Hypotheses */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {/* Left: Verifiable Ground Truth */}
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-blue-600" />
-                      Observed Telemetry Facts (Ground Truth)
-                    </p>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-mono font-bold">LOG-BACKED</span>
-                  </div>
-
-                  {Array.isArray(ai_analysis.observed_behavior) && ai_analysis.observed_behavior.length > 0 ? (
-                    <ul className="space-y-2 text-xs text-slate-700">
-                      {ai_analysis.observed_behavior.map((obs, idx) => (
-                        <li key={idx} className="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200/80">
-                          <span className="text-blue-600 font-bold">•</span>
-                          <span>{obs}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-xs text-slate-600 p-2 bg-white rounded-lg border border-slate-200">
-                      {ai_analysis.observed_behavior_explanation || 'Interactions recorded across honeypot sensors.'}
-                    </p>
-                  )}
-                </div>
-
-                {/* Right: AI Analytical Interpretation */}
-                <div className="p-4 rounded-xl bg-purple-50/40 border border-purple-100 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-purple-800 flex items-center gap-1.5">
-                      <Cpu className="w-3.5 h-3.5 text-purple-600" />
-                      Adversary Threat Modeling & Intent
-                    </p>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-purple-100 text-purple-700 font-mono font-bold">ANALYST HYPOTHESIS</span>
-                  </div>
-
-                  {ai_analysis.likely_objective && (
-                    <div className="p-2.5 rounded-lg bg-white border border-purple-200">
-                      <strong className="text-purple-800 block text-[10px] uppercase tracking-wider mb-0.5">Primary Attacker Goal</strong>
-                      <p className="text-xs text-slate-800 font-medium">{ai_analysis.likely_objective}</p>
-                    </div>
-                  )}
-
-                  {Array.isArray(ai_analysis.ai_interpretation) && ai_analysis.ai_interpretation.length > 0 && (
-                    <ul className="space-y-1.5 text-xs text-slate-700">
-                      {ai_analysis.ai_interpretation.map((interp, idx) => (
-                        <li key={idx} className="flex items-start gap-2 p-2 rounded-lg bg-white border border-purple-100">
-                          <span className="text-purple-600 font-bold">→</span>
-                          <span>{interp}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="card p-8 text-center bg-white border border-slate-200">
-              <Cpu className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm font-bold text-slate-700">AI Telemetry Analysis Pending</p>
-              <p className="text-xs text-slate-400 mt-1">Collecting and clustering decoy telemetry signals...</p>
-            </div>
-          )}
-
-          {/* METADATA & RISK EVOLUTION */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="card p-5 bg-white border border-slate-200">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">
-                Decoy Session Telemetry Specs
-              </h4>
-              <div className="space-y-2.5">
-                {[
-                  { label: 'First Contact',    value: formatTs(displayFirstSeen) },
-                  { label: 'Latest Interaction',  value: formatTs(displayLastSeen) },
-                  { label: 'Total Telemetry Traces', value: events.length },
-                  { label: 'Captured Artifacts / IOCs', value: iocs.length },
-                  { label: 'Containment State', value: status || 'ACTIVE' },
-                ].map(({ label, value }) => (
-                  <div key={label} className="flex items-center justify-between py-1.5 border-b border-slate-100 text-xs">
-                    <span className="text-slate-500 font-medium">{label}</span>
-                    <span className="text-slate-900 font-bold font-mono">{String(value)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="card p-5 bg-white border border-slate-200">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="w-4 h-4 text-amber-600" />
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Threat Risk Score Progression
-                </h4>
-              </div>
-              {riskTimelineData.length > 1 ? (
-                <ResponsiveContainer width="100%" height={160}>
-                  <LineChart data={riskTimelineData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                    <XAxis dataKey="t" tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} />
-                    <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [`${v}`, 'Risk Score']} />
-                    <Line type="monotone" dataKey="risk" stroke="#d97706" strokeWidth={2.5}
-                      dot={{ fill: '#d97706', r: 3 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-36 flex items-center justify-center">
-                  <p className="text-xs text-slate-400">Single event recorded</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: 1-CLICK ACTIVE DEFENSE PLAYBOOK */}
-      {activeTab === 'playbook' && (
-        <div className="space-y-5">
-          <div className="card p-6 bg-white border border-slate-200 space-y-6">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-emerald-600" />
-                  Active Defense Playbook & Live Firewall Rules
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Pre-compiled actionable containment commands and SIEM detection rules for this adversary
-                </p>
-              </div>
-
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-                <button
-                  onClick={() => setRuleFormat('ufw')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    ruleFormat === 'ufw' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'
-                  }`}
-                >
-                  UFW Rule
-                </button>
-                <button
-                  onClick={() => setRuleFormat('iptables')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    ruleFormat === 'iptables' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'
-                  }`}
-                >
-                  iptables
-                </button>
-                <button
-                  onClick={() => setRuleFormat('snort')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    ruleFormat === 'snort' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'
-                  }`}
-                >
-                  Snort / Suricata
-                </button>
-              </div>
-            </div>
-
-            {/* Code Box */}
-            <div className="p-4 rounded-xl bg-slate-900 text-slate-100 space-y-2 border border-slate-800">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono text-slate-400 font-semibold uppercase">
-                  {ruleFormat.toUpperCase()} Firewall Command
-                </span>
-                <CopyBtn
-                  text={ruleFormat === 'ufw' ? ufwCmd : ruleFormat === 'iptables' ? iptablesCmd : snortRule}
-                  label="Copy Rule"
-                />
-              </div>
-              <pre className="text-xs font-mono text-emerald-400 whitespace-pre-wrap break-all select-all">
-                {ruleFormat === 'ufw' ? ufwCmd : ruleFormat === 'iptables' ? iptablesCmd : snortRule}
-              </pre>
-            </div>
-
-            {/* AI Action Recommendations */}
-            {ai_analysis?.recommended_actions && (
-              <div className="space-y-3 pt-4 border-t border-slate-100">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Recommended Threat Mitigation Steps
-                </h4>
-                <div className="space-y-2">
+                <ul className="space-y-1 text-xs text-slate-700">
                   {(Array.isArray(ai_analysis.recommended_actions) ? ai_analysis.recommended_actions : [ai_analysis.recommended_defensive_action]).map((rec, i) => (
-                    <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-emerald-50/40 border border-emerald-100">
-                      <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[10px] font-black flex-shrink-0 mt-0.5">
-                        {i + 1}
-                      </div>
-                      <p className="text-xs text-slate-800 font-medium">{rec}</p>
-                    </div>
+                    <li key={i} className="flex items-start gap-1.5">
+                      <span className="text-emerald-600 font-bold">→</span>
+                      <span>{rec}</span>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* TAB 3: FORENSIC ATTACK TELEMETRY */}
-      {activeTab === 'timeline' && (
-        <div className="card p-6 bg-white border border-slate-200">
-          <div className="flex items-center justify-between gap-4 mb-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-sky-50 border border-sky-100">
-                <Activity className="w-4 h-4 text-sky-600" />
+      {/* Metadata + Risk Timeline */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Metadata */}
+        <div className="card p-6">
+          <h3 className="text-sm font-bold text-slate-800 mb-4">Session Telemetry Metadata</h3>
+          <div className="space-y-3">
+            {[
+              { label: 'First Seen',    value: formatTs(displayFirstSeen) },
+              { label: 'Last Updated',  value: formatTs(displayLastSeen) },
+              { label: 'Total Events',  value: events.length },
+              { label: 'IOCs Captured', value: iocs.length },
+              { label: 'Status',        value: status || '—' },
+            ].map(({ label, value }) => (
+              <div key={label} className="flex items-center justify-between py-2 border-b border-slate-100">
+                <span className="text-xs font-semibold text-slate-500">{label}</span>
+                <span className="text-xs font-bold text-slate-800 font-mono">{String(value)}</span>
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-800">Raw Decoy Interaction Trace</h3>
-                <p className="text-[11px] text-slate-400">{events.length} telemetry interactions captured</p>
-              </div>
-            </div>
+            ))}
           </div>
+        </div>
 
-          {events.length === 0 ? (
-            <p className="text-sm text-center py-8 text-slate-400">No events recorded for this session</p>
+        {/* Risk Score Timeline */}
+        <div className="card p-6">
+          <div className="flex items-center gap-2.5 mb-4">
+            <TrendingUp className="w-4 h-4 text-amber-600" />
+            <h3 className="text-sm font-bold text-slate-800">Risk Score Evolution</h3>
+          </div>
+          {riskTimelineData.length > 1 ? (
+            <ResponsiveContainer width="100%" height={160}>
+              <LineChart data={riskTimelineData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <XAxis dataKey="t" tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [`${v}`, 'Risk Score']} />
+                <Line type="monotone" dataKey="risk" stroke="#d97706" strokeWidth={2.5}
+                  dot={{ fill: '#d97706', r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
           ) : (
-            <div className="space-y-2 max-h-[500px] overflow-y-auto">
-              {events.map((ev, i) => {
-                const evKey = ev.event_id || i;
-                const explanation = eventExplanations[evKey];
-                const isExplaining = explainingEventId === evKey;
-
-                return (
-                  <div key={evKey} className="border border-slate-200 rounded-xl overflow-hidden">
-                    <div className="flex items-center justify-between gap-3 px-3.5 py-3 bg-slate-50/70 hover:bg-slate-50 transition-colors">
-                      <div
-                        onClick={() => setExpandedEvent(expandedEvent === i ? null : i)}
-                        className="flex items-start gap-3 flex-1 min-w-0 cursor-pointer"
-                      >
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 bg-sky-100 border border-sky-200">
-                          <Terminal className="w-3 h-3 text-sky-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-bold text-slate-800 font-mono">
-                              {ev.event || ev.event_type || 'Interaction'}
-                            </span>
-                            <span className="text-[10px] font-mono text-slate-400">
-                              {formatTs(ev.timestamp || ev.created_at)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                          onClick={() => handleExplainEvent(ev, i)}
-                          disabled={isExplaining}
-                          className="px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200 hover:from-blue-100 hover:to-indigo-100 transition-all cursor-pointer"
-                        >
-                          <Zap className={`w-3 h-3 text-blue-600 ${isExplaining ? 'animate-pulse' : ''}`} />
-                          {isExplaining ? 'Analyzing...' : 'Explain with AI'}
-                        </button>
-
-                        <button
-                          onClick={() => setExpandedEvent(expandedEvent === i ? null : i)}
-                          className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        >
-                          {expandedEvent === i ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* AI Explanation Box */}
-                    {explanation && expandedEvent === i && (
-                      <div className="px-4 py-3.5 bg-blue-50/60 border-t border-blue-100 space-y-2 text-xs">
-                        <div className="flex items-center gap-1.5 text-blue-800 font-bold">
-                          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                          <span>AI Telemetry Dissection</span>
-                        </div>
-                        <p><strong className="text-slate-800">Observed Action:</strong> {explanation.observed_behavior}</p>
-                        <p><strong className="text-purple-700">Threat Intent:</strong> {explanation.ai_interpretation}</p>
-                        <p><strong className="text-slate-700">Context:</strong> {explanation.threat_context}</p>
-                        <p><strong className="text-emerald-700">Remediation:</strong> {explanation.defensive_note}</p>
-                      </div>
-                    )}
-
-                    {/* Raw JSON viewer */}
-                    {!explanation && expandedEvent === i && (
-                      <div className="px-4 py-3 bg-slate-900 border-t border-slate-800">
-                        <pre className="text-[11px] font-mono whitespace-pre-wrap break-all text-slate-200">
-                          {JSON.stringify(ev.metadata || ev, null, 2)}
-                        </pre>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="h-40 flex items-center justify-center">
+              <p className="text-xs text-slate-400">Insufficient data points</p>
             </div>
           )}
         </div>
-      )}
+      </div>
 
-      {/* IOCs Captured */}
+      {/* EVENT TIMELINE WITH EXPLAIN WITH AI */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between gap-4 mb-5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-sky-50 border border-sky-100">
+              <Activity className="w-4 h-4 text-sky-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Forensic Attack Timeline</h3>
+              <p className="text-[11px] text-slate-400">{events.length} telemetry interactions recorded</p>
+            </div>
+          </div>
+        </div>
+
+        {events.length === 0 ? (
+          <p className="text-sm text-center py-8 text-slate-400">No events recorded for this session</p>
+        ) : (
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {events.map((ev, i) => {
+              const evKey = ev.event_id || i;
+              const explanation = eventExplanations[evKey];
+              const isExplaining = explainingEventId === evKey;
+
+              return (
+                <div key={evKey} className="border border-slate-100 rounded-xl overflow-hidden">
+                  <div className="flex items-center justify-between gap-3 px-3.5 py-3 bg-slate-50/60 hover:bg-slate-50 transition-colors">
+                    <div
+                      onClick={() => setExpandedEvent(expandedEvent === i ? null : i)}
+                      className="flex items-start gap-3 flex-1 min-w-0 cursor-pointer"
+                    >
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 bg-sky-100 border border-sky-200">
+                        <Terminal className="w-3 h-3 text-sky-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-slate-800 font-mono">
+                            {ev.event || ev.event_type || 'Interaction'}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400">
+                            {formatTs(ev.timestamp || ev.created_at)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleExplainEvent(ev, i)}
+                        disabled={isExplaining}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200 hover:from-blue-100 hover:to-indigo-100 transition-all cursor-pointer"
+                      >
+                        <Zap className={`w-3 h-3 text-blue-600 ${isExplaining ? 'animate-pulse' : ''}`} />
+                        {isExplaining ? 'Analyzing...' : 'Explain with AI'}
+                      </button>
+
+                      <button
+                        onClick={() => setExpandedEvent(expandedEvent === i ? null : i)}
+                        className="p-1 text-slate-400 hover:text-slate-600"
+                      >
+                        {expandedEvent === i ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* AI Explanation Box */}
+                  {explanation && expandedEvent === i && (
+                    <div className="px-4 py-3 bg-blue-50/50 border-t border-blue-100 space-y-2 text-xs">
+                      <div className="flex items-center gap-1.5 text-blue-700 font-bold">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>AI Forensic Event Breakdown</span>
+                      </div>
+                      <p><strong className="text-slate-800">Observed Behavior:</strong> {explanation.observed_behavior}</p>
+                      <p><strong className="text-purple-700">AI Interpretation:</strong> {explanation.ai_interpretation}</p>
+                      <p><strong className="text-slate-700">Threat Context:</strong> {explanation.threat_context}</p>
+                      <p><strong className="text-emerald-700">Defensive Note:</strong> {explanation.defensive_note}</p>
+                    </div>
+                  )}
+
+                  {/* Raw JSON viewer */}
+                  {!explanation && expandedEvent === i && (
+                    <div className="px-4 py-3 bg-slate-900 border-t border-slate-800">
+                      <pre className="text-[11px] font-mono whitespace-pre-wrap break-all text-slate-200">
+                        {JSON.stringify(ev.metadata || ev, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* IOCs from this session */}
       {iocs.length > 0 && (
-        <div className="card p-5 bg-white border border-slate-200">
-          <div className="flex items-center gap-2 mb-3">
+        <div className="card p-6">
+          <div className="flex items-center gap-2.5 mb-4">
             <AlertTriangle className="w-4 h-4 text-amber-600" />
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              Captured Honeypot Indicators of Compromise ({iocs.length})
-            </h4>
+            <h3 className="text-sm font-bold text-slate-800">Indicators of Compromise ({iocs.length})</h3>
           </div>
           <div className="flex flex-wrap gap-2">
             {iocs.map((ioc, i) => (
-              <span key={i} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200">
+              <span key={i} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200/70">
                 {ioc.ioc_type && <span className="text-[10px] opacity-70">[{ioc.ioc_type}]</span>}
                 {ioc.value || ioc}
                 <CopyBtn text={ioc.value || ioc} />
@@ -750,7 +453,6 @@ export default function AttackInvestigation({ sessionData, onContainSession }) {
           </div>
         </div>
       )}
-
     </div>
   );
 }
