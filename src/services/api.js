@@ -1,8 +1,15 @@
-// ─── API Service ─────────────────────────────────────────────────────────────
-// Connects to: https://kurukshetra-backend.onrender.com
-// All calls go through this centralized client with error handling.
+// Connects to local FastAPI backend (http://127.0.0.1:8000) in dev or Render in cloud
+function getBaseUrl() {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/$/, '');
+  }
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return 'http://127.0.0.1:8000';
+  }
+  return 'https://kurukshetra-backend.onrender.com';
+}
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://kurukshetra-backend.onrender.com';
+const BASE_URL = getBaseUrl();
 
 async function apiFetch(path, options = {}) {
   const url = `${BASE_URL}${path}`;

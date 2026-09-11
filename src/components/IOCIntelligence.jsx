@@ -39,9 +39,11 @@ function CopyBtn({ text }) {
 
 function IOCRow({ ioc }) {
   const val = ioc.value || ioc.indicator || String(ioc);
-  const type = ioc.type || 'unknown';
+  const type = ioc.ioc_type || ioc.type || 'unknown';
   const meta = getTypeMeta(type);
   const Icon = meta.icon;
+  const sessionId = ioc.session_id || (Array.isArray(ioc.session_ids) ? ioc.session_ids[0] : null);
+  const timeVal = ioc.last_seen || ioc.timestamp || ioc.first_seen;
 
   return (
     <tr className="tr-hover group border-b border-slate-100">
@@ -61,16 +63,16 @@ function IOCRow({ ioc }) {
         </div>
       </td>
       <td className="px-4 py-3">
-        {ioc.session_id && (
+        {sessionId && (
           <span className="font-mono text-[11px] px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-100">
-            {ioc.session_id.slice(0, 16)}…
+            {sessionId.slice(0, 16)}…
           </span>
         )}
       </td>
       <td className="px-4 py-3">
-        {ioc.timestamp && (
+        {timeVal && (
           <span className="text-[11px] font-mono text-slate-400">
-            {new Date(ioc.timestamp).toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}
+            {new Date(timeVal).toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}
           </span>
         )}
       </td>

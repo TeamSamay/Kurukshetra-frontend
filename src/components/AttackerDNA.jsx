@@ -11,12 +11,19 @@ function riskColor(score) {
 function AttackerCard({ attacker }) {
   const [expanded, setExpanded] = useState(false);
   const {
-    attacker_id, source_ip, dna_fingerprint, total_sessions = 0,
-    max_risk_score = 0, services_used = [], commands_used = [],
+    attacker_id, source_ip, source_ips = [], dna_fingerprint, fingerprints = [],
+    total_sessions, session_ids = [], total_events = 0,
+    max_risk_score = 0, services_used = [], primary_tactics = [], commands_used = [],
     first_seen, last_seen, country, threat_level,
   } = attacker;
 
-  const r = (threat_level || '').toUpperCase();
+  const displayIp = source_ip || source_ips[0] || '?.?.?.?';
+  const displayDna = dna_fingerprint || fingerprints[0] || attacker_id;
+  const sessionCount = total_sessions ?? session_ids.length;
+  const tactics = primary_tactics.length > 0 ? primary_tactics : services_used;
+
+  const threatLevelCalc = threat_level || (max_risk_score >= 80 ? 'CRITICAL' : max_risk_score >= 50 ? 'HIGH' : max_risk_score >= 25 ? 'MEDIUM' : 'LOW');
+  const r = threatLevelCalc.toUpperCase();
   const badgeClass = r === 'CRITICAL' ? 'badge-critical' : r === 'HIGH' ? 'badge-high' : r === 'MEDIUM' ? 'badge-medium' : 'badge-low';
 
   return (
@@ -29,21 +36,21 @@ function AttackerCard({ attacker }) {
               <Fingerprint className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="font-mono font-bold text-sm text-blue-600">{source_ip || '?.?.?.?'}</p>
+              <p className="font-mono font-bold text-sm text-blue-600">{displayIp}</p>
               {country && (
                 <p className="flex items-center gap-1 text-[11px] mt-0.5 text-slate-400">
                   <MapPin className="w-3 h-3" /> {country}
                 </p>
               )}
-              {dna_fingerprint && (
+              {displayDna && (
                 <p className="font-mono text-[10px] mt-1 px-2 py-0.5 rounded-md inline-block bg-purple-50 text-purple-700 border border-purple-100">
-                  {dna_fingerprint}
+                  {displayDna}
                 </p>
               )}
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
-            {threat_level && <span className={`badge ${badgeClass}`}>{threat_level}</span>}
+            <span className={`badge ${badgeClass}`}>{threatLevelCalc}</span>
             <div className="text-center">
               <p className="text-xl font-black" style={{ color: riskColor(max_risk_score) }}>{max_risk_score}</p>
               <p className="text-[10px] text-slate-400">Max Risk</p>
@@ -65,9 +72,9 @@ function AttackerCard({ attacker }) {
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-3 mt-4">
           {[
-            { label: 'Sessions', value: total_sessions },
-            { label: 'Services', value: services_used.length || '—' },
-            { label: 'Commands', value: commands_used.length || '—' },
+            { label: 'Sessions', value: sessionCount },
+            { label: 'Events', value: total_events || sessionCount },
+            { label: 'Tactics', value: tactics.length || '—' },
           ].map(({ label, value }) => (
             <div key={label} className="text-center px-2 py-2 rounded-xl bg-slate-50 border border-slate-100">
               <p className="text-base font-black text-slate-800">{value}</p>
@@ -76,10 +83,10 @@ function AttackerCard({ attacker }) {
           ))}
         </div>
 
-        {/* Services pills */}
-        {services_used.length > 0 && (
+        {/* Tactics pills */}
+        {tactics.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-3">
-            {services_used.map(s => (
+            {tactics.map(s => (
               <span key={s} className="badge badge-info text-[10px]">{s.toUpperCase()}</span>
             ))}
           </div>

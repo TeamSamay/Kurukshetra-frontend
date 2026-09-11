@@ -1,9 +1,16 @@
-// ─── Resilient WebSocket Client ───────────────────────────────────────────────
-// Connects to wss://kurukshetra-backend.onrender.com/ws/attacks
-// Auto-reconnects with exponential backoff.
+// Connects to local FastAPI backend (ws://127.0.0.1:8000/ws/attacks) in dev or Render in cloud
+function getWsEndpoint() {
+  if (import.meta.env.VITE_WS_URL) {
+    const base = import.meta.env.VITE_WS_URL.replace(/\/$/, '');
+    return `${base}/ws/attacks`;
+  }
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return 'ws://127.0.0.1:8000/ws/attacks';
+  }
+  return 'wss://kurukshetra-backend.onrender.com/ws/attacks';
+}
 
-const WS_BASE = import.meta.env.VITE_WS_URL || 'wss://kurukshetra-backend.onrender.com';
-const WS_ENDPOINT = `${WS_BASE}/ws/attacks`;
+const WS_ENDPOINT = getWsEndpoint();
 const MAX_RETRIES_BEFORE_POLL = 5;
 const POLL_INTERVAL_MS = 10000;
 

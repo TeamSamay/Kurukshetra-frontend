@@ -113,36 +113,101 @@ export default function App() {
     const ws = new AttackWebSocketManager(null, handleWsMsg, (ok) => setWsConnected(ok));
     ws.connect();
     return () => ws.disconnect();
-  }, []); // eslint-disable-line
+  }, [selectedId]); // eslint-disable-line
 
   function handleWsMsg(data) {
+    if (!data) return;
+
     if (data.type === 'POLL_TICK') {
       // Polling fallback: refresh all data
       loadAll();
       return;
     }
-    if (data.type === 'NEW_ATTACK_EVENT' || data.type === 'new_attack') {
-      const ev = data.event || data;
-      if (ev.session_id) {
-        setAttacks(prev =>
-          prev.some(a => a.session_id === ev.session_id)
-            ? prev.map(a => a.session_id === ev.session_id ? { ...a, ...ev } : a)
-            : [ev, ...prev]
-        );
-        setSummaryData(prev => ({
-          ...prev,
-          active_sessions: (prev.active_sessions || 0) + 1,
-          total_events:    (prev.total_events    || 0) + 1,
-          recent_attacks:  [ev, ...(prev.recent_attacks || [])].slice(0, 20),
-        }));
-        addToast(`New attack: ${ev.source_ip || '?'} → ${(ev.service || 'UNKNOWN').toUpperCase()}`);
+
+    // 1. Live Honeypot Telemetry / Attack Event
+    if (data.type === 'NEW_EVENT' || data.type === 'NEW_ATTACK_EVENT' || data.type === 'new_attack') {
+      const payloadData = data.data || {};
+      const eventObj = payloadData.event || data.event || data;
+      const sessionDoc = payloadData.session || data.session || eventObj;
+      const newIocs = payloadData.extracted_iocs || [];
+      const newMitre = payloadData.mitre_matches || [];
+
+      const sessionId = sessionDoc.session_id || eventObj.session_id;
+
+      if (sessionId) {
+        // A. Update Attacks List
+        setAttacks(prev => {
+          const exists = prev.some(a => a.session_id === sessionId);
+          if (exists) {
+            return prev.map(a => (a.session_id === sessionId ? { ...a, ...sessionDoc } : a));
+          }
+          return [sessionDoc, ...prev];
+        });
+
+        // B. Update Dashboard Summary Metrics
+        setSummaryData(prev => {
+          const currentRecent = prev.recent_attacks || [];
+          const updatedRecent = currentRecent.some(a => a.session_id === sessionId)
+            ? currentRecent.map(a => (a.session_id === sessionId ? { ...a, ...sessionDoc } : a))
+            : [sessionDoc, ...currentRecent].slice(0, 20);
+
+          return {
+            ...prev,
+            total_events: (prev.total_events || 0) + 1,
+            active_sessions: (sessionDoc.status === 'ACTIVE' || !sessionDoc.status)
+              ? Math.max((prev.active_sessions || 0), 1)
+              : prev.active_sessions,
+            total_iocs: (prev.total_iocs || 0) + newIocs.length,
+            recent_attacks: updatedRecent,
+          };
+        });
+
+        // C. Update Active Investigation View if open
+        if (selectedId === sessionId) {
+          setSession(prev => {
+            if (!prev) return prev;
+            const updatedEvents = prev.events ? [...prev.events, eventObj] : [eventObj];
+            const updatedIocs = prev.iocs ? [...prev.iocs, ...newIocs] : newIocs;
+            const updatedMitre = prev.mitre_mappings ? [...prev.mitre_mappings, ...newMitre] : newMitre;
+            return {
+              ...prev,
+              ...sessionDoc,
+              events: updatedEvents,
+              iocs: updatedIocs,
+              mitre_mappings: updatedMitre,
+              risk_score: sessionDoc.risk_score ?? prev.risk_score,
+              risk_level: sessionDoc.risk_level ?? prev.risk_level,
+            };
+          });
+        }
+
+        // D. Update IOC Intelligence View
+        if (newIocs.length > 0) {
+          setIocList(prev => [...newIocs, ...prev]);
+        }
+
+        // E. Update MITRE ATT&CK View
+        if (newMitre.length > 0) {
+          setMitreData(prev => [...newMitre, ...prev]);
+        }
+
+        // F. Trigger Instant Alert Toast
+        const sourceIp = eventObj.source_ip || sessionDoc.source_ip || 'Unknown Attacker';
+        const svc = (eventObj.service || sessionDoc.service || 'HONEYPOT').toUpperCase();
+        const action = eventObj.event || eventObj.event_type || 'Interaction detected';
+        addToast(`🔴 [${svc}] ${sourceIp}: ${action.slice(0, 45)}`);
       }
     }
+
+    // 2. Live Session Containment Event
     if (data.type === 'SESSION_CONTAINED') {
-      const id = data.session_id;
+      const id = data.data?.session_id || data.session_id;
       if (id) {
-        setAttacks(prev => prev.map(a => a.session_id === id ? { ...a, status: 'CONTAINED' } : a));
-        addToast(`Session ${id.slice(0,12)}… contained`);
+        setAttacks(prev => prev.map(a => (a.session_id === id ? { ...a, status: 'CONTAINED' } : a)));
+        if (selectedId === id) {
+          setSession(p => (p ? { ...p, status: 'CONTAINED' } : p));
+        }
+        addToast(`🛡️ Session ${id.slice(0, 12)}… isolated and contained`);
       }
     }
   }

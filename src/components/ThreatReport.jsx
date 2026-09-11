@@ -49,23 +49,21 @@ export default function ThreatReport({ reportData, onContainSession }) {
     );
   }
 
-  const {
-    session_id,
-    source_ip,
-    service,
-    risk_score = 0,
-    risk_level,
-    containment_status,
-    generated_at,
-    executive_summary,
-    attacker_objective,
-    attack_narrative,
-    mitre_techniques = [],
-    iocs_summary = [],
-    recommendations = [],
-    ai_analysis,
-    threat_actor_profile,
-  } = reportData;
+  const session_id = reportData.session_id;
+  const source_ip = reportData.source_ip || reportData.attack_source?.source_ip;
+  const service = reportData.service || reportData.attack_source?.service || reportData.target?.service;
+  const risk_score = reportData.risk_score ?? reportData.risk?.score ?? 0;
+  const risk_level = reportData.risk_level || reportData.risk?.level || (risk_score >= 80 ? 'CRITICAL' : risk_score >= 50 ? 'HIGH' : 'LOW');
+  const containment_status = typeof reportData.containment_status === 'object' ? reportData.containment_status?.status : reportData.containment_status;
+  const generated_at = reportData.generated_at;
+  const executive_summary = reportData.executive_summary || reportData.ai_analysis?.summary;
+  const attacker_objective = reportData.attacker_objective || reportData.ai_analysis?.likely_objective;
+  const attack_narrative = reportData.attack_narrative || reportData.ai_analysis?.observed_behavior_explanation;
+  const mitre_techniques = reportData.mitre_techniques || reportData.mitre_mapping || [];
+  const iocs_summary = reportData.iocs_summary || reportData.iocs || [];
+  const recommendations = reportData.recommendations || (reportData.ai_analysis?.recommended_defensive_action ? [reportData.ai_analysis.recommended_defensive_action] : []);
+  const ai_analysis = typeof reportData.ai_analysis === 'string' ? reportData.ai_analysis : reportData.ai_analysis?.risk_explanation;
+  const threat_actor_profile = reportData.threat_actor_profile || (reportData.attacker_fingerprint ? { fingerprint: reportData.attacker_fingerprint } : null);
 
   const isContained = (containment_status || '').toUpperCase() === 'CONTAINED';
 

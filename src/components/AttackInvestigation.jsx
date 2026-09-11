@@ -65,9 +65,13 @@ export default function AttackInvestigation({ sessionData, onContainSession }) {
 
   const {
     session_id, source_ip, service, status, risk_level,
-    risk_score = 0, attacker_dna, events = [], iocs = [],
-    created_at, updated_at,
+    risk_score = 0, attacker_dna, fingerprint, events = [], iocs = [],
+    created_at, updated_at, start_time, last_seen
   } = sessionData;
+
+  const displayFingerprint = fingerprint || attacker_dna;
+  const displayFirstSeen = start_time || created_at;
+  const displayLastSeen = last_seen || updated_at;
 
   const riskTimelineData = buildRiskTimeline(events);
   const isContained = (status || '').toUpperCase() === 'CONTAINED';
@@ -129,11 +133,11 @@ export default function AttackInvestigation({ sessionData, onContainSession }) {
         </div>
 
         {/* Attacker DNA */}
-        {attacker_dna && (
+        {displayFingerprint && (
           <div className="mt-4 px-4 py-2.5 rounded-xl flex items-center gap-3 bg-purple-50/70 border border-purple-100">
             <span className="text-[10px] font-bold tracking-widest uppercase text-purple-600">ATTACKER DNA</span>
-            <span className="font-mono font-bold text-purple-700">{attacker_dna}</span>
-            <CopyBtn text={attacker_dna} />
+            <span className="font-mono font-bold text-purple-700">{displayFingerprint}</span>
+            <CopyBtn text={displayFingerprint} />
           </div>
         )}
       </div>
@@ -145,8 +149,8 @@ export default function AttackInvestigation({ sessionData, onContainSession }) {
           <h3 className="text-sm font-bold text-slate-800 mb-4">Session Metadata</h3>
           <div className="space-y-3">
             {[
-              { label: 'First Seen',    value: formatTs(created_at) },
-              { label: 'Last Updated',  value: formatTs(updated_at) },
+              { label: 'First Seen',    value: formatTs(displayFirstSeen) },
+              { label: 'Last Updated',  value: formatTs(displayLastSeen) },
               { label: 'Total Events',  value: events.length },
               { label: 'IOCs Captured', value: iocs.length },
               { label: 'Status',        value: status || '—' },
