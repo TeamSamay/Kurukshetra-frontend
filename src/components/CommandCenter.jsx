@@ -2,13 +2,17 @@ import React, { useState, useEffect } from 'react';
 import {
   Shield, Server, Database, Radio, Search, Lock, AlertTriangle,
   Terminal, Globe, Activity, Eye, FileText, ArrowUpRight, Play,
-  Pause, RotateCcw, Check, Zap, ExternalLink, Cpu, Sliders
+  Pause, RotateCcw, Check, Zap, ExternalLink, Cpu, Sliders,
+  ShieldCheck, XCircle, RefreshCw, Sparkles, Copy
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
 } from 'recharts';
-import { fetchDashboardSummary, fetchAIThreatAnalysis, runAttackSimulation } from '../services/api';
+import {
+  fetchDashboardSummary, fetchAIThreatAnalysis, runAttackSimulation,
+  fetchBlockchainSummary, triggerTamperDemo, restoreTamperDemo, fetchVulnerabilityGuard
+} from '../services/api';
 
 const TOOLTIP_STYLE = {
   background: '#1e1e22',
@@ -36,6 +40,15 @@ export default function CommandCenter({ summaryData, attacks = [], loading: pare
   const [activeTabSection, setActiveTabSection] = useState('liveFeed');
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+
+  // Blockchain Ledger state
+  const [bcSummary, setBcSummary] = useState(summaryData?.blockchain_summary || null);
+  const [verifyingBc, setVerifyingBc] = useState(false);
+  const [tamperFeedback, setTamperFeedback] = useState('');
+
+  // Vulnerability Guard state
+  const [vulnGuards, setVulnGuards] = useState([]);
+  const [vulnLoading, setVulnLoading] = useState(false);
 
   // Accordion state
   const [openAccordion, setOpenAccordion] = useState({
@@ -81,6 +94,65 @@ export default function CommandCenter({ summaryData, attacks = [], loading: pare
     const t = setInterval(load, 10000);
     return () => { cancelled = true; clearInterval(t); };
   }, [activeTabSection]);
+
+  // Load Vulnerability Guard when tab opened
+  useEffect(() => {
+    if (activeTabSection !== 'vulnGuard') return;
+    let cancelled = false;
+    async function load() {
+      setVulnLoading(true);
+      try {
+        const res = await fetchVulnerabilityGuard();
+        if (!cancelled && res) setVulnGuards(res);
+      } catch (err) {
+        console.error('Failed to load vulnerability guard:', err);
+      } finally {
+        if (!cancelled) setVulnLoading(false);
+      }
+    }
+    load();
+  }, [activeTabSection]);
+
+  // Blockchain chain load & verify
+  const loadBlockchainSummary = async () => {
+    setVerifyingBc(true);
+    try {
+      const sum = await fetchBlockchainSummary();
+      setBcSummary(sum);
+    } catch (err) {
+      console.error('Failed to verify blockchain chain:', err);
+    } finally {
+      setVerifyingBc(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBlockchainSummary();
+    const t = setInterval(loadBlockchainSummary, 12000);
+    return () => clearInterval(t);
+  }, []);
+
+  async function handleTamperDemo() {
+    setTamperFeedback('Running controlled demo test tamper...');
+    try {
+      const res = await triggerTamperDemo();
+      setTamperFeedback(`⚠️ TAMPER DETECTED: ${res.message}`);
+      await loadBlockchainSummary();
+    } catch (err) {
+      setTamperFeedback(`Demo failed: ${err.message}`);
+    }
+  }
+
+  async function handleRestoreDemo() {
+    setTamperFeedback('Restoring test record to authentic state...');
+    try {
+      const res = await restoreTamperDemo();
+      setTamperFeedback(`✓ RESTORED: ${res.message}`);
+      await loadBlockchainSummary();
+    } catch (err) {
+      setTamperFeedback(`Restore failed: ${err.message}`);
+    }
+  }
 
   async function handleTriggerSimulation() {
     if (simulating) return;
@@ -521,6 +593,93 @@ export default function CommandCenter({ summaryData, attacks = [], loading: pare
 
       </div>
 
+      {/* ── BLOCKCHAIN EVIDENCE INTEGRITY SECTION ─────────────────────────── */}
+      <div className="crextio-card p-5 sm:p-6 space-y-4 border-l-4" style={{
+        borderLeftColor: (bcSummary?.integrity_alerts || 0) > 0 ? '#e11d48' : '#059669'
+      }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+              (bcSummary?.integrity_alerts || 0) > 0 ? 'bg-rose-50 border border-rose-200' : 'bg-emerald-50 border border-emerald-200'
+            }`}>
+              {(bcSummary?.integrity_alerts || 0) > 0 ? (
+                <XCircle className="w-5 h-5 text-rose-600" />
+              ) : (
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-neutral-900">Blockchain Evidence Integrity Ledger</h3>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold font-mono ${
+                  (bcSummary?.integrity_alerts || 0) > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                }`}>
+                  {bcSummary?.chain_status === 'VALID' ? '✓ CHAIN VALID' : '⚠️ INTEGRITY ALERT'}
+                </span>
+              </div>
+              <p className="text-xs text-neutral-500 mt-0.5">
+                Tamper-evident SHA-256 cryptographic proof anchored for every honeypot telemetry event
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={loadBlockchainSummary}
+              disabled={verifyingBc}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold border border-neutral-200 bg-white hover:bg-neutral-50 transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${verifyingBc ? 'animate-spin' : ''}`} />
+              <span>{verifyingBc ? 'Verifying Chain...' : 'Verify Entire Chain'}</span>
+            </button>
+
+            <button
+              onClick={handleTamperDemo}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition cursor-pointer"
+              title="Demonstrates mathematical tamper detection on a local test record"
+            >
+              ⚡ Run Tamper Demo
+            </button>
+
+            <button
+              onClick={handleRestoreDemo}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition cursor-pointer"
+            >
+              ✓ Restore Record
+            </button>
+          </div>
+        </div>
+
+        {/* Blockchain Metrics Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+          <div className="p-3 rounded-2xl bg-neutral-50 border border-neutral-100">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Total Evidence Blocks</p>
+            <p className="text-xl font-light text-neutral-900 mt-0.5">{bcSummary?.total_evidence_blocks ?? 0}</p>
+          </div>
+          <div className="p-3 rounded-2xl bg-neutral-50 border border-neutral-100">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Verified Evidence</p>
+            <p className="text-xl font-light text-emerald-600 mt-0.5">{bcSummary?.verified_evidence ?? 0}</p>
+          </div>
+          <div className="p-3 rounded-2xl bg-neutral-50 border border-neutral-100">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Integrity Alerts</p>
+            <p className="text-xl font-light text-rose-600 mt-0.5">{bcSummary?.integrity_alerts ?? 0}</p>
+          </div>
+          <div className="p-3 rounded-2xl bg-neutral-50 border border-neutral-100">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Latest Block Header</p>
+            <p className="text-xs font-mono font-bold text-neutral-800 mt-1 truncate" title={bcSummary?.latest_block_hash}>
+              #{bcSummary?.latest_block || 1} · {bcSummary?.latest_evidence || 'EVT-0001'}
+            </p>
+          </div>
+        </div>
+
+        {tamperFeedback && (
+          <div className="p-3 rounded-xl bg-neutral-900 text-white font-mono text-xs flex items-center justify-between">
+            <span>{tamperFeedback}</span>
+            <button onClick={() => setTamperFeedback('')} className="text-neutral-400 hover:text-white">✕</button>
+          </div>
+        )}
+      </div>
+
       {/* ── UNIFIED FULL-WIDTH LIVE SOC SECTIONS ──────────────────────────── */}
       <div className="crextio-card p-5 sm:p-6 space-y-5">
         {/* Sub-Header & Navigation Tabs */}
@@ -540,6 +699,7 @@ export default function CommandCenter({ summaryData, attacks = [], loading: pare
               { id: 'liveFeed', label: 'Live Infiltrations', icon: Activity },
               { id: 'mitreMatrix', label: 'MITRE ATT&CK Matrix', icon: Shield },
               { id: 'aiInsights', label: 'AI Advisory', icon: Zap },
+              { id: 'vulnGuard', label: 'AI Vulnerability Guard', icon: Sparkles },
             ].map(tab => {
               const Icon = tab.icon;
               const isActive = activeTabSection === tab.id;
@@ -680,7 +840,7 @@ export default function CommandCenter({ summaryData, attacks = [], loading: pare
           </div>
         )}
 
-        {/* Tab 3: Gemini AI Advisory */}
+        {/* Tab 3: Groq + Llama AI Advisory */}
         {activeTabSection === 'aiInsights' && (
           <div className="p-5 rounded-2xl bg-neutral-900 text-white space-y-4">
             <div className="flex items-center justify-between">
@@ -690,7 +850,7 @@ export default function CommandCenter({ summaryData, attacks = [], loading: pare
               </div>
               {aiAnalysis?.ai_powered ? (
                 <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500 text-white">
-                  LLM ACTIVE · {aiAnalysis.model_used?.split('(')[0] || 'AI'}
+                  LLM ACTIVE · {aiAnalysis.model_used?.split('(')[0] || 'Llama-3.3-70B'}
                 </span>
               ) : (
                 <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#f8c858] text-neutral-950">
@@ -705,18 +865,6 @@ export default function CommandCenter({ summaryData, attacks = [], loading: pare
                 <p>
                   <strong className="text-white">Threat Summary:</strong> {aiAnalysis.executive_summary}
                 </p>
-                {(aiAnalysis.attack_vectors && aiAnalysis.attack_vectors.length > 0) && (
-                  <p>
-                    <strong className="text-white">Attack Vectors:</strong>{' '}
-                    {aiAnalysis.attack_vectors.join(', ')}
-                  </p>
-                )}
-                {(aiAnalysis.mitre_techniques && aiAnalysis.mitre_techniques.length > 0) && (
-                  <p>
-                    <strong className="text-white">MITRE Techniques:</strong>{' '}
-                    {aiAnalysis.mitre_techniques.join(', ')}
-                  </p>
-                )}
                 {aiAnalysis.likely_objective && (
                   <p>
                     <strong className="text-white">Likely Objective:</strong> {aiAnalysis.likely_objective}
@@ -724,7 +872,7 @@ export default function CommandCenter({ summaryData, attacks = [], loading: pare
                 )}
                 {aiAnalysis.observed_behavior && (
                   <p>
-                    <strong className="text-white">Observed Behavior:</strong> {aiAnalysis.observed_behavior}
+                    <strong className="text-white">Observed Behavior:</strong> {Array.isArray(aiAnalysis.observed_behavior) ? aiAnalysis.observed_behavior.join(' ') : aiAnalysis.observed_behavior}
                   </p>
                 )}
                 {(aiAnalysis.recommendations && aiAnalysis.recommendations.length > 0) && (
@@ -740,6 +888,59 @@ export default function CommandCenter({ summaryData, attacks = [], loading: pare
             ) : (
               <div className="text-xs text-neutral-400 py-6 text-center">
                 Live AI advisory unavailable. Check backend /api/ai/threat-analysis.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 4: AI Vulnerability & Exposure Guard */}
+        {activeTabSection === 'vulnGuard' && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-xs font-bold text-amber-900">Deception Telemetry Exposure Diagnosis</h4>
+                <p className="text-[11px] text-amber-800 mt-0.5">
+                  Analyzes what resources and bugs attackers are hunting for across our honeypot traps,
+                  and provides defensive hardening recommendations for real production servers.
+                </p>
+              </div>
+            </div>
+
+            {vulnLoading ? (
+              <div className="text-xs text-neutral-500 py-8 text-center">Diagnosing perimeter exposures...</div>
+            ) : vulnGuards.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {vulnGuards.map((item, idx) => (
+                  <div key={idx} className="p-4 rounded-2xl border bg-white border-neutral-200 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        item.risk_severity === 'CRITICAL' ? 'bg-rose-100 text-rose-700' :
+                        item.risk_severity === 'HIGH' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {item.risk_severity} EXPOSURE
+                      </span>
+                      <span className="text-[10px] font-mono text-neutral-400">Pattern: {item.observed_pattern}</span>
+                    </div>
+
+                    <h4 className="text-sm font-bold text-neutral-900">{item.target_interest}</h4>
+                    <p className="text-xs text-neutral-600 leading-relaxed">{item.potential_exposure}</p>
+
+                    <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-100 space-y-1.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Defensive Hardening Guide</p>
+                      <p className="text-xs text-neutral-800 font-medium">{item.defensive_recommendation}</p>
+                      {item.remediation_guide && (
+                        <pre className="p-2 rounded-lg bg-neutral-900 text-neutral-200 text-[11px] font-mono whitespace-pre-wrap break-all mt-1">
+                          {item.remediation_guide}
+                        </pre>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-xs text-neutral-400">
+                No active exposures detected yet. All deception traps are listening.
               </div>
             )}
           </div>

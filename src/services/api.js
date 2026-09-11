@@ -56,9 +56,31 @@ export const fetchMitre = (sessionId) =>
 // ─── Reports ─────────────────────────────────────────────────────────────────
 export const fetchReport = (sessionId) => apiFetch(`/api/reports/${sessionId}`);
 
-// ─── AI Threat Landscape (live analysis for AI Advisory tab) ────────────────
+// ─── AI Threat Landscape & Vulnerability Guard ──────────────────────────────
 export const fetchAIThreatAnalysis = (limit = 40) =>
   apiFetch(`/api/ai/threat-analysis?limit=${limit}`);
+
+export const explainEventWithAI = (eventData) =>
+  apiFetch('/api/ai/explain-event', { method: 'POST', body: JSON.stringify(eventData) });
+
+export const fetchVulnerabilityGuard = () =>
+  apiFetch('/api/ai/vulnerability-guard');
+
+// ─── Blockchain Evidence Integrity ──────────────────────────────────────────
+export const fetchBlockchainSummary = () =>
+  apiFetch('/api/blockchain/verify');
+
+export const verifyEvidence = (evidenceId) =>
+  apiFetch(`/api/blockchain/verify/${evidenceId}`);
+
+export const fetchBlockchainBlocks = (limit = 50) =>
+  apiFetch(`/api/blockchain/blocks?limit=${limit}`);
+
+export const triggerTamperDemo = () =>
+  apiFetch('/api/blockchain/demo-tamper', { method: 'POST' });
+
+export const restoreTamperDemo = () =>
+  apiFetch('/api/blockchain/demo-restore', { method: 'POST' });
 
 // ─── One-Click Simulator ─────────────────────────────────────────────────────
 // Sends a full multi-stage attack campaign to the live backend (schema-compliant).

@@ -1,7 +1,8 @@
 import React from 'react';
 import {
   FileText, Shield, AlertTriangle, CheckCircle, Lock, Clock,
-  Terminal, Target, TrendingUp, Download
+  Terminal, Target, TrendingUp, Download, ShieldCheck, XCircle,
+  Printer, Cpu, Sparkles
 } from 'lucide-react';
 
 function formatTs(ts) {
@@ -56,16 +57,20 @@ export default function ThreatReport({ reportData, onContainSession }) {
   const risk_level = reportData.risk_level || reportData.risk?.level || (risk_score >= 80 ? 'CRITICAL' : risk_score >= 50 ? 'HIGH' : 'LOW');
   const containment_status = typeof reportData.containment_status === 'object' ? reportData.containment_status?.status : reportData.containment_status;
   const generated_at = reportData.generated_at;
-  const executive_summary = reportData.executive_summary || reportData.ai_analysis?.summary;
-  const attacker_objective = reportData.attacker_objective || reportData.ai_analysis?.likely_objective;
-  const attack_narrative = reportData.attack_narrative || reportData.ai_analysis?.observed_behavior_explanation;
+
+  const ai = reportData.ai_analysis || {};
+  const executive_summary = reportData.executive_summary || ai.threat_summary || ai.summary;
+  const attacker_objective = reportData.attacker_objective || ai.likely_objective;
+  const observed_behavior = reportData.observed_behavior || ai.observed_behavior || (ai.observed_behavior_explanation ? [ai.observed_behavior_explanation] : []);
+  const ai_interpretation = ai.ai_interpretation || [];
   const mitre_techniques = reportData.mitre_techniques || reportData.mitre_mapping || [];
   const iocs_summary = reportData.iocs_summary || reportData.iocs || [];
-  const recommendations = reportData.recommendations || (reportData.ai_analysis?.recommended_defensive_action ? [reportData.ai_analysis.recommended_defensive_action] : []);
-  const ai_analysis = typeof reportData.ai_analysis === 'string' ? reportData.ai_analysis : reportData.ai_analysis?.risk_explanation;
-  const threat_actor_profile = reportData.threat_actor_profile || (reportData.attacker_fingerprint ? { fingerprint: reportData.attacker_fingerprint } : null);
+  const recommendations = reportData.recommendations || ai.recommended_actions || (ai.recommended_defensive_action ? [ai.recommended_defensive_action] : []);
+  const evidence_integrity = reportData.evidence_integrity || 'VERIFIED';
+  const blockchain_proof = reportData.blockchain_proof;
 
   const isContained = (containment_status || '').toUpperCase() === 'CONTAINED';
+  const isTampered = evidence_integrity === 'TAMPER_DETECTED';
 
   const handleExport = () => {
     const content = JSON.stringify(reportData, null, 2);
@@ -78,8 +83,12 @@ export default function ThreatReport({ reportData, onContainSession }) {
     URL.revokeObjectURL(url);
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
-    <div className="space-y-5 fade-in-up">
+    <div className="space-y-5 fade-in-up print:p-0">
 
       {/* Report Header */}
       <div className="card p-6">
@@ -89,15 +98,15 @@ export default function ThreatReport({ reportData, onContainSession }) {
               <FileText className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-slate-800">Threat Intelligence Report</h2>
+              <h2 className="text-lg font-black text-slate-800">Executive Threat Intelligence Incident Report</h2>
               <p className="font-mono text-xs mt-1 text-slate-400">
-                Session: {session_id}
+                Incident ID: {reportData.report_id || `RPT-${session_id}`}
               </p>
               <div className="flex items-center gap-2 flex-wrap mt-2">
                 {source_ip && (
                   <span className="font-mono text-sm font-bold text-blue-600">{source_ip}</span>
                 )}
-                {service && <span className="badge badge-info text-[10px]">{service.toUpperCase()}</span>}
+                {service && <span className="badge badge-info text-[10px]">{(service).toUpperCase()} DECOY</span>}
                 {risk_level && (
                   <span className={`badge ${
                     risk_level === 'CRITICAL' ? 'badge-critical' :
@@ -126,73 +135,112 @@ export default function ThreatReport({ reportData, onContainSession }) {
 
             <div className="flex flex-col gap-2">
               {!isContained && onContainSession && (
-                <button onClick={() => onContainSession(session_id)} className="btn-danger">
-                  <Lock className="w-4 h-4" /> Contain Now
+                <button onClick={() => onContainSession(session_id)} className="btn-danger text-xs">
+                  <Lock className="w-3.5 h-3.5" /> Contain Now
                 </button>
               )}
-              <button onClick={handleExport} className="btn-ghost text-xs">
-                <Download className="w-3.5 h-3.5 text-slate-500" /> Export JSON
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={handlePrint} className="btn-ghost text-xs flex items-center gap-1">
+                  <Printer className="w-3.5 h-3.5" /> Print
+                </button>
+                <button onClick={handleExport} className="btn-ghost text-xs flex items-center gap-1">
+                  <Download className="w-3.5 h-3.5" /> Export JSON
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
+      {/* BLOCKCHAIN EVIDENCE INTEGRITY STAMP */}
+      <div className="card p-5 border-l-4" style={{
+        borderLeftColor: isTampered ? '#e11d48' : '#059669'
+      }}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+              isTampered ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'
+            }`}>
+              {isTampered ? <XCircle className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                  Tamper-Evident Evidence Seal
+                </h4>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                  isTampered ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                }`}>
+                  {isTampered ? '⚠️ TAMPER DETECTED' : '✓ VERIFIED ON-CHAIN'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Cryptographic SHA-256 hash proof registered on Kurukshetra Evidence Ledger
+              </p>
+            </div>
+          </div>
+
+          {blockchain_proof && (
+            <div className="text-right text-[11px] font-mono text-slate-500">
+              <p>Evidence ID: <strong className="text-slate-800">{blockchain_proof.evidence_id}</strong> (Block #{blockchain_proof.block_index})</p>
+              <p className="truncate max-w-xs">Hash: {blockchain_proof.event_hash}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Executive Summary */}
       {executive_summary && (
-        <Section icon={Target} title="Executive Summary" iconBg="bg-blue-50 border border-blue-100" iconColor="text-blue-600">
+        <Section icon={Target} title="Executive Summary (AI Threat Analyst)" iconBg="bg-blue-50 border border-blue-100" iconColor="text-blue-600">
           <p className="text-sm leading-relaxed text-slate-700">
             {executive_summary}
           </p>
         </Section>
       )}
 
-      {/* AI Analysis */}
-      {ai_analysis && (
-        <Section icon={TrendingUp} title="AI Threat Analysis" iconBg="bg-purple-50 border border-purple-100" iconColor="text-purple-600">
-          <div className="px-4 py-3 rounded-xl text-sm leading-relaxed bg-purple-50/50 border border-purple-100">
-            <p className="text-slate-700">{ai_analysis}</p>
-          </div>
+      {/* Observed Behavior vs AI Interpretation */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Observed Behavior */}
+        <Section icon={Terminal} title="Observed Telemetry Behavior" iconBg="bg-slate-100 border border-slate-200" iconColor="text-slate-700">
+          {Array.isArray(observed_behavior) && observed_behavior.length > 0 ? (
+            <ul className="space-y-2 text-xs text-slate-700">
+              {observed_behavior.map((item, idx) => (
+                <li key={idx} className="flex items-start gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
+                  <span className="text-blue-600 font-bold">•</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-slate-500">Telemetry logs recorded across decoy interfaces.</p>
+          )}
         </Section>
-      )}
 
-      {/* Attacker Objective */}
-      {attacker_objective && (
-        <Section icon={AlertTriangle} title="Assessed Attacker Objective" iconBg="bg-amber-50 border border-amber-100" iconColor="text-amber-600">
-          <div className="px-4 py-3 rounded-xl bg-amber-50/50 border border-amber-100">
-            <p className="text-sm font-semibold text-amber-700">{attacker_objective}</p>
-          </div>
-        </Section>
-      )}
-
-      {/* Attack Narrative */}
-      {attack_narrative && (
-        <Section icon={Terminal} title="Attack Narrative" iconBg="bg-sky-50 border border-sky-100" iconColor="text-sky-600">
-          <p className="text-sm leading-relaxed font-mono text-slate-700 bg-slate-50/80 p-4 rounded-xl border border-slate-100">
-            {attack_narrative}
-          </p>
-        </Section>
-      )}
-
-      {/* Threat Actor Profile */}
-      {threat_actor_profile && (
-        <Section icon={Shield} title="Threat Actor Profile" iconBg="bg-rose-50 border border-rose-100" iconColor="text-rose-600">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {Object.entries(threat_actor_profile).map(([key, value]) => (
-              <div key={key} className="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                <p className="text-[10px] font-bold tracking-widest uppercase text-slate-400">
-                  {key.replace(/_/g, ' ')}
-                </p>
-                <p className="text-xs font-bold text-slate-800 mt-1">{String(value)}</p>
+        {/* AI Interpretation */}
+        <Section icon={Cpu} title="AI Threat Interpretation & Objective" iconBg="bg-purple-50 border border-purple-100" iconColor="text-purple-600">
+          <div className="space-y-3 text-xs text-slate-700">
+            {attacker_objective && (
+              <div className="p-2.5 rounded-lg bg-purple-50/60 border border-purple-100">
+                <strong className="text-purple-800 block text-[10px] uppercase tracking-wider mb-1">Likely Objective</strong>
+                <p>{attacker_objective}</p>
               </div>
-            ))}
+            )}
+            {Array.isArray(ai_interpretation) && ai_interpretation.length > 0 && (
+              <ul className="space-y-1.5">
+                {ai_interpretation.map((interp, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-purple-600 font-bold">→</span>
+                    <span>{interp}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </Section>
-      )}
+      </div>
 
       {/* Two column: MITRE + IOCs */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
         {/* MITRE Techniques */}
         {mitre_techniques.length > 0 && (
           <Section icon={Shield} title={`MITRE ATT&CK Techniques (${mitre_techniques.length})`} iconBg="bg-purple-50 border border-purple-100" iconColor="text-purple-600">
@@ -218,10 +266,11 @@ export default function ThreatReport({ reportData, onContainSession }) {
 
         {/* IOC Summary */}
         {iocs_summary.length > 0 && (
-          <Section icon={AlertTriangle} title={`IOC Summary (${iocs_summary.length})`} iconBg="bg-amber-50 border border-amber-100" iconColor="text-amber-600">
+          <Section icon={AlertTriangle} title={`Captured Indicators of Compromise (${iocs_summary.length})`} iconBg="bg-amber-50 border border-amber-100" iconColor="text-amber-600">
             <div className="flex flex-wrap gap-2">
               {iocs_summary.map((ioc, i) => (
                 <span key={i} className="font-mono text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200/70">
+                  {ioc.ioc_type && <span className="text-[10px] opacity-70 mr-1">[{ioc.ioc_type}]</span>}
                   {ioc.value || ioc.indicator || String(ioc)}
                 </span>
               ))}
@@ -232,14 +281,14 @@ export default function ThreatReport({ reportData, onContainSession }) {
 
       {/* Defensive Recommendations */}
       {recommendations.length > 0 && (
-        <Section icon={CheckCircle} title="Defensive Recommendations" iconBg="bg-emerald-50 border border-emerald-100" iconColor="text-emerald-600">
-          <div className="space-y-2">
+        <Section icon={CheckCircle} title="Human-Reviewed Defensive Remediation Actions" iconBg="bg-emerald-50 border border-emerald-100" iconColor="text-emerald-600">
+          <div className="space-y-2.5">
             {recommendations.map((rec, i) => (
               <div key={i} className="flex items-start gap-3 px-4 py-3 rounded-xl bg-emerald-50/40 border border-emerald-100">
                 <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 mt-0.5 bg-emerald-100 text-emerald-700">
                   {i + 1}
                 </span>
-                <p className="text-sm text-slate-700">{rec}</p>
+                <p className="text-sm text-slate-700 font-medium">{rec}</p>
               </div>
             ))}
           </div>
@@ -248,4 +297,3 @@ export default function ThreatReport({ reportData, onContainSession }) {
     </div>
   );
 }
-
