@@ -8,6 +8,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { explainEventWithAI } from '../services/api';
+import AIThreatIntelligenceCard from './AIThreatIntelligenceCard';
 
 function riskBadge(risk) {
   const r = (risk || '').toUpperCase();
@@ -190,111 +191,18 @@ export default function AttackInvestigation({ sessionData, onContainSession }) {
         )}
       </div>
 
-      {/* STRUCTURED AI THREAT ANALYST PANEL (Clean Theme) */}
+      {/* ADVANCED AI THREAT ANALYST INTELLIGENCE STUDIO */}
       {ai_analysis && (
-        <div className="card p-6">
-          <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-blue-50 border border-blue-200">
-                <Cpu className="w-4 h-4 text-blue-600" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-slate-800">AI Threat Analyst Intelligence</h3>
-                  <span className="badge badge-info text-[10px]">
-                    Kurukshetra Cyber Threat Intelligence Engine
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400">Structured telemetry reasoning & objective analysis</p>
-              </div>
-            </div>
-
-            {/* 1-Click Action Button */}
-            <button
-              onClick={copyFirewallRule}
-              className="btn-ghost text-xs flex items-center gap-1.5 border border-slate-200 bg-slate-50 hover:bg-slate-100"
-              title="Copy UFW Firewall block rule for this attacker IP"
-            >
-              {copiedRule ? (
-                <>
-                  <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-emerald-700 font-bold">UFW Block Rule Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Shield className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Copy Firewall Ban Rule</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {/* Threat Summary */}
-            <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Threat Summary</p>
-              <p className="text-xs text-slate-700 mt-1 leading-relaxed">
-                {ai_analysis.threat_summary || ai_analysis.summary}
-              </p>
-            </div>
-
-            {/* Observed Behavior vs AI Interpretation */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-2">
-                  ✓ Observed Behavior (Verifiable Telemetry)
-                </p>
-                {Array.isArray(ai_analysis.observed_behavior) && ai_analysis.observed_behavior.length > 0 ? (
-                  <ul className="space-y-1.5 text-xs text-slate-700">
-                    {ai_analysis.observed_behavior.map((obs, idx) => (
-                      <li key={idx} className="flex items-start gap-1.5">
-                        <span className="text-blue-600 font-bold">•</span>
-                        <span>{obs}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-xs text-slate-600">{ai_analysis.observed_behavior_explanation || 'Interactions recorded across honeypot sensors.'}</p>
-                )}
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-purple-50/50 border border-purple-100">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-purple-700 mb-2">
-                  🧠 AI Interpretation (Intent & Threat Modeling)
-                </p>
-                {Array.isArray(ai_analysis.ai_interpretation) && ai_analysis.ai_interpretation.length > 0 ? (
-                  <ul className="space-y-1.5 text-xs text-slate-700">
-                    {ai_analysis.ai_interpretation.map((interp, idx) => (
-                      <li key={idx} className="flex items-start gap-1.5">
-                        <span className="text-purple-600 font-bold">•</span>
-                        <span>{interp}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-xs text-slate-600">Likely intent: {ai_analysis.likely_objective || 'Reconnaissance and service probing.'}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Recommended Defensive Actions */}
-            {ai_analysis.recommended_actions && (
-              <div className="p-3.5 rounded-xl bg-emerald-50/50 border border-emerald-100">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 mb-1.5">
-                  🛡️ Human-Reviewed Defensive Recommendations
-                </p>
-                <ul className="space-y-1 text-xs text-slate-700">
-                  {(Array.isArray(ai_analysis.recommended_actions) ? ai_analysis.recommended_actions : [ai_analysis.recommended_defensive_action]).map((rec, i) => (
-                    <li key={i} className="flex items-start gap-1.5">
-                      <span className="text-emerald-600 font-bold">→</span>
-                      <span>{rec}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
+        <AIThreatIntelligenceCard
+          ai_analysis={ai_analysis}
+          source_ip={source_ip}
+          service={service}
+          risk_score={risk_score}
+          risk_level={risk_level}
+          events={events}
+          copiedRule={copiedRule}
+          copyFirewallRule={copyFirewallRule}
+        />
       )}
 
       {/* Metadata + Risk Timeline */}
