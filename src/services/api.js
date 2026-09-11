@@ -1,10 +1,14 @@
-// Connects to local FastAPI backend (http://127.0.0.1:8000) in dev or Render in cloud
-function getBaseUrl() {
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL.replace(/\/$/, '');
+// Connects to live Render backend by default on Vercel and remote hosts
+export function getBaseUrl() {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    // On Vercel or any remote production domain, ALWAYS use live Render backend
+    if (host.includes('vercel.app') || (host !== 'localhost' && host !== '127.0.0.1' && !host.startsWith('192.168.'))) {
+      return 'https://kurukshetra-backend.onrender.com';
+    }
   }
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return 'http://127.0.0.1:8000';
+  if (import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.includes('127.0.0.1') && !import.meta.env.VITE_API_URL.includes('localhost')) {
+    return import.meta.env.VITE_API_URL.replace(/\/$/, '');
   }
   return 'https://kurukshetra-backend.onrender.com';
 }

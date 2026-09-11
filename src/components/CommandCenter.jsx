@@ -86,8 +86,9 @@ function buildTrend(recentAttacks) {
   }
   const buckets = {};
   recentAttacks.forEach(a => {
-    const h = new Date(a.timestamp || a.created_at || Date.now()).getHours();
-    const key = `${h}:00`;
+    const rawTs = a.last_seen || a.start_time || a.timestamp || a.created_at;
+    const h = rawTs ? new Date(rawTs).getHours() : new Date().getHours();
+    const key = `${String(h).padStart(2, '0')}:00`;
     buckets[key] = (buckets[key] || 0) + 1;
   });
   return Object.entries(buckets).map(([time, attacks]) => ({ time, attacks, iocs: Math.floor(attacks * 1.4) }));
@@ -96,7 +97,8 @@ function buildTrend(recentAttacks) {
 function formatTime(ts) {
   if (!ts) return '--:--';
   const d = new Date(ts);
-  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  if (isNaN(d.getTime())) return '--:--';
+  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 export default function CommandCenter({ summaryData, loading: parentLoading }) {
@@ -320,8 +322,8 @@ export default function CommandCenter({ summaryData, loading: parentLoading }) {
                 <div key={atk.session_id || i}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl tr-hover bg-slate-50/50 border border-slate-100">
                   <Clock className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
-                  <span className="text-[11px] font-mono tabular-nums flex-shrink-0 text-slate-400">
-                    {formatTime(atk.timestamp || atk.created_at)}
+                  <span className="text-[11px] font-mono tabular-nums flex-shrink-0 text-slate-500 font-semibold">
+                    {formatTime(atk.last_seen || atk.start_time || atk.timestamp || atk.created_at)}
                   </span>
                   <span className="text-xs font-mono font-bold flex-shrink-0 text-blue-600">
                     {atk.source_ip || '?.?.?.?'}

@@ -1,11 +1,15 @@
-// Connects to local FastAPI backend (ws://127.0.0.1:8000/ws/attacks) in dev or Render in cloud
-function getWsEndpoint() {
-  if (import.meta.env.VITE_WS_URL) {
+// Connects to live Render WebSocket (wss://kurukshetra-backend.onrender.com/ws/attacks) by default
+export function getWsEndpoint() {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    // On Vercel or any remote production domain (HTTPS), ALWAYS use secure WSS Render backend
+    if (host.includes('vercel.app') || (host !== 'localhost' && host !== '127.0.0.1' && !host.startsWith('192.168.'))) {
+      return 'wss://kurukshetra-backend.onrender.com/ws/attacks';
+    }
+  }
+  if (import.meta.env.VITE_WS_URL && !import.meta.env.VITE_WS_URL.includes('127.0.0.1') && !import.meta.env.VITE_WS_URL.includes('localhost')) {
     const base = import.meta.env.VITE_WS_URL.replace(/\/$/, '');
     return `${base}/ws/attacks`;
-  }
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return 'ws://127.0.0.1:8000/ws/attacks';
   }
   return 'wss://kurukshetra-backend.onrender.com/ws/attacks';
 }

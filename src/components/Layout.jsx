@@ -21,13 +21,15 @@ function LiveClock() {
   useEffect(() => {
     const tick = () => {
       const now = new Date();
-      setTime(now.toUTCString().replace('GMT', 'UTC').slice(0, -4));
+      const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+      const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      setTime(`${dateStr} · ${timeStr}`);
     };
     tick();
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
   }, []);
-  return <span className="font-mono text-[11px] text-slate-500 tabular-nums">{time}</span>;
+  return <span className="font-mono text-[11px] font-bold text-slate-700 tabular-nums">{time}</span>;
 }
 
 export default function Layout({ activeTab, setActiveTab, wsConnected, activeAttackCount, children }) {
@@ -214,17 +216,17 @@ export default function Layout({ activeTab, setActiveTab, wsConnected, activeAtt
           </div>
 
           {/* Right: status items */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+            {/* Live Clock (Always Visible) */}
+            <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 shadow-xs">
+              <Clock className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+              <LiveClock />
+            </div>
+
             {/* Backend status */}
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 blink" />
               BACKEND LIVE
-            </div>
-
-            {/* Clock */}
-            <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80">
-              <Clock className="w-3.5 h-3.5 text-slate-400" />
-              <LiveClock />
             </div>
 
             {/* Notifications */}
@@ -238,13 +240,13 @@ export default function Layout({ activeTab, setActiveTab, wsConnected, activeAtt
             </button>
 
             {/* WS badge */}
-            <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold ${
+            <div className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl text-[10px] sm:text-[11px] font-bold ${
               wsConnected
                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
                 : 'bg-rose-50 text-rose-600 border border-rose-200/60'
             }`}>
               <Radio className="w-3 h-3" />
-              <span>{wsConnected ? 'WS' : 'REST'}</span>
+              <span>{wsConnected ? 'WS LIVE' : 'WS RECONNECT'}</span>
             </div>
           </div>
         </header>
