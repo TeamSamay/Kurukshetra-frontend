@@ -116,21 +116,11 @@ export default function App() {
           total_events: Math.max(sum.value.total_events ?? 0, prev.total_events ?? 0),
           total_sessions: Math.max(sum.value.total_sessions ?? 0, prev.total_sessions ?? 0),
           total_iocs: Math.max(sum.value.total_iocs ?? 0, prev.total_iocs ?? 0),
-          recent_attacks: (prev.recent_attacks && prev.recent_attacks.length > 0)
-            ? [
-                ...prev.recent_attacks.slice(0, 3),
-                ...(sum.value.recent_attacks || []).filter(sa => !prev.recent_attacks.slice(0, 3).some(pa => pa.session_id === sa.session_id))
-              ].slice(0, 20)
-            : (sum.value.recent_attacks || []),
+          recent_attacks: sum.value.recent_attacks || prev.recent_attacks || [],
         }));
       }
       if (atks.status === 'fulfilled' && atks.value) {
-        setAttacks(prev => {
-          if (!prev || prev.length === 0) return atks.value;
-          const recentTop = prev.slice(0, 3);
-          const remaining = atks.value.filter(a => !recentTop.some(r => r.session_id === a.session_id));
-          return [...recentTop, ...remaining];
-        });
+        setAttacks(atks.value);
 
         // Auto-select first session if none selected yet
         if (!selectedIdRef.current && atks.value.length > 0) {
