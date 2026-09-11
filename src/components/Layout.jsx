@@ -34,9 +34,9 @@ export default function Layout({
     setSimMsg('');
     try {
       await runAttackSimulation();
-      setSimMsg('✓ Attack injected into deception honeypot!');
-    } catch {
-      setSimMsg('⚡ Attack simulated');
+      setSimMsg('✓ Full attack campaign injected — check Live Attacks tab!');
+    } catch (e) {
+      setSimMsg(`⚡ Simulation: ${e.message?.slice(0, 60) || 'check backend'}`);
     } finally {
       setTimeout(() => {
         setSimulating(false);
