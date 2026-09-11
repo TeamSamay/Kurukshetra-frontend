@@ -22,16 +22,13 @@ function Toast({ msg, title = 'SECURITY ALERT', onClose }) {
   }, [msg, onClose]);
 
   return (
-    <div className="fixed top-20 right-6 z-[200] max-w-sm w-full slide-right">
-      <div className="card px-4 py-3 flex items-start gap-3 border border-rose-500/50 shadow-2xl rounded-xl"
-        style={{ background: '#0b1120', boxShadow: '0 0 25px rgba(244,63,94,0.35)' }}>
-        <div className="w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0 bg-rose-500 blink" />
-        <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-black text-rose-400 tracking-wider font-mono">{title}</p>
-          <p className="text-xs mt-0.5 text-slate-200 font-mono break-all leading-snug">{msg}</p>
-        </div>
-        <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors flex-shrink-0 text-sm font-bold">✕</button>
+    <div className="w-full max-w-sm rounded-2xl p-3.5 flex items-start gap-3 bg-[#1e1e22] text-white border border-rose-500/40 shadow-2xl slide-right">
+      <div className="w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0 bg-rose-500 blink" />
+      <div className="flex-1 min-w-0">
+        <p className="text-[11px] font-bold text-rose-400 tracking-wider font-mono uppercase">{title}</p>
+        <p className="text-xs mt-0.5 text-neutral-200 font-mono break-all leading-snug">{msg}</p>
       </div>
+      <button onClick={onClose} className="text-neutral-400 hover:text-white transition-colors flex-shrink-0 text-sm font-bold cursor-pointer">✕</button>
     </div>
   );
 }
@@ -265,8 +262,8 @@ export default function App() {
 
   return (
     <>
-      {/* Toast Notifications */}
-      <div className="fixed top-4 right-4 z-[200] space-y-2 pointer-events-none">
+      {/* Toast Notifications - Clean bottom-right positioning */}
+      <div className="fixed bottom-6 right-6 z-[200] space-y-2 pointer-events-none max-w-sm w-full">
         {toasts.map(t => (
           <div key={t.id} className="pointer-events-auto">
             <Toast msg={t.msg} title={t.title} onClose={() => removeToast(t.id)} />
