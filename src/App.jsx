@@ -11,6 +11,7 @@ import ThreatReport from './components/ThreatReport';
 import {
   fetchDashboardSummary, fetchAttacks, fetchSessionDetails,
   fetchIOCs, fetchAttackers, fetchMitre, fetchReport, containSession,
+  getCached,
 } from './services/api';
 import { AttackWebSocketManager } from './services/websocket';
 import { ShieldAlert, Zap, Lock, X } from 'lucide-react';
@@ -54,16 +55,16 @@ function Toast({ msg, title = 'SECURITY EVENT', onClose }) {
 export default function App() {
   const [activeTab, setActiveTab]       = useState('command');
   const [wsConnected, setWsConnected]   = useState(false);
-  const [summaryData, setSummaryData]   = useState({});
-  const [attacks, setAttacks]           = useState([]);
+  const [summaryData, setSummaryData]   = useState(() => getCached('dashboard_summary') || {});
+  const [attacks, setAttacks]           = useState(() => getCached('attacks_list') || []);
   const [selectedId, setSelectedId]     = useState(null);
   const [sessionDetails, setSession]    = useState(null);
-  const [iocList, setIocList]           = useState([]);
-  const [attackers, setAttackers]       = useState([]);
-  const [mitreData, setMitreData]       = useState([]);
+  const [iocList, setIocList]           = useState(() => getCached('iocs_list') || []);
+  const [attackers, setAttackers]       = useState(() => getCached('attackers_list') || []);
+  const [mitreData, setMitreData]       = useState(() => getCached('mitre_list') || []);
   const [reportData, setReportData]     = useState(null);
   const [toasts, setToasts]             = useState([]);
-  const [loading, setLoading]           = useState(true);
+  const [loading, setLoading]           = useState(false);
 
   const selectedIdRef = React.useRef(selectedId);
   selectedIdRef.current = selectedId;

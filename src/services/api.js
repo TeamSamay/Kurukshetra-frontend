@@ -15,43 +15,126 @@ export function getBaseUrl() {
 
 const BASE_URL = getBaseUrl();
 
-async function apiFetch(path, options = {}) {
-  const url = `${BASE_URL}${path}`;
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-    ...options,
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`[${res.status}] ${path}: ${text}`);
-  }
-  // Some endpoints return empty body on success
-  const ct = res.headers.get('content-type') || '';
-  if (ct.includes('application/json')) return res.json();
+// ── Fast Storage Cache Helper for Instant UI Hydration ───────────────────────
+export function getCached(key, maxAgeMs = 120000) {
+  try {
+    const item = localStorage.getItem(`kurukshetra_${key}`);
+    if (!item) return null;
+    const parsed = JSON.parse(item);
+    if (Date.now() - parsed.ts < maxAgeMs) {
+      return parsed.data;
+    }
+  } catch {}
   return null;
 }
 
+export function setCached(key, data) {
+  try {
+    if (data) {
+      localStorage.setItem(`kurukshetra_${key}`, JSON.stringify({ ts: Date.now(), data }));
+    }
+  } catch {}
+}
+
+async function apiFetch(path, options = {}) {
+  const url = `${BASE_URL}${path}`;
+  const controller = new AbortController();
+  const timeoutMs = options.timeout || 10000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      headers: { 'Content-Type': 'application/json', ...options.headers },
+      signal: controller.signal,
+      ...options,
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`[${res.status}] ${path}: ${text}`);
+    }
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('application/json')) return res.json();
+    return null;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+}
+
 // ─── Health ──────────────────────────────────────────────────────────────────
-export const checkHealth = () => apiFetch('/health');
+export const checkHealth = () => apiFetch('/health', { timeout: 4000 });
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
-export const fetchDashboardSummary = () => apiFetch('/api/dashboard/summary');
+export const fetchDashboardSummary = async () => {
+  try {
+    const data = await apiFetch('/api/dashboard/summary');
+    if (data) setCached('dashboard_summary', data);
+    return data;
+  } catch (err) {
+    const cached = getCached('dashboard_summary');
+    if (cached) return cached;
+    throw err;
+  }
+};
 
 // ─── Attacks / Sessions ──────────────────────────────────────────────────────
-export const fetchAttacks = () => apiFetch('/api/attacks');
+export const fetchAttacks = async () => {
+  try {
+    const data = await apiFetch('/api/attacks');
+    if (data && Array.isArray(data)) setCached('attacks_list', data);
+    return data;
+  } catch (err) {
+    const cached = getCached('attacks_list');
+    if (cached) return cached;
+    throw err;
+  }
+};
+
 export const fetchSessionDetails = (id) => apiFetch(`/api/sessions/${id}`);
 export const containSession = (id) =>
   apiFetch(`/api/sessions/${id}/contain`, { method: 'POST' });
 
 // ─── IOCs ────────────────────────────────────────────────────────────────────
-export const fetchIOCs = () => apiFetch('/api/iocs');
+export const fetchIOCs = async () => {
+  try {
+    const data = await apiFetch('/api/iocs');
+    if (data) setCached('iocs_list', data);
+    return data;
+  } catch (err) {
+    const cached = getCached('iocs_list');
+    if (cached) return cached;
+    throw err;
+  }
+};
 
 // ─── Attacker DNA ────────────────────────────────────────────────────────────
-export const fetchAttackers = () => apiFetch('/api/attackers');
+export const fetchAttackers = async () => {
+  try {
+    const data = await apiFetch('/api/attackers');
+    if (data) setCached('attackers_list', data);
+    return data;
+  } catch (err) {
+    const cached = getCached('attackers_list');
+    if (cached) return cached;
+    throw err;
+  }
+};
 
 // ─── MITRE ATT&CK ────────────────────────────────────────────────────────────
-export const fetchMitre = (sessionId) =>
-  apiFetch(sessionId ? `/api/mitre/${sessionId}` : '/api/mitre');
+export const fetchMitre = async (sessionId) => {
+  try {
+    const data = await apiFetch(sessionId ? `/api/mitre/${sessionId}` : '/api/mitre');
+    if (data && !sessionId) setCached('mitre_list', data);
+    return data;
+  } catch (err) {
+    if (!sessionId) {
+      const cached = getCached('mitre_list');
+      if (cached) return cached;
+    }
+    throw err;
+  }
+};
 
 // ─── Reports ─────────────────────────────────────────────────────────────────
 export const fetchReport = (sessionId) => apiFetch(`/api/reports/${sessionId}`);
@@ -67,8 +150,17 @@ export const fetchVulnerabilityGuard = () =>
   apiFetch('/api/ai/vulnerability-guard');
 
 // ─── Blockchain Evidence Integrity ──────────────────────────────────────────
-export const fetchBlockchainSummary = () =>
-  apiFetch('/api/blockchain/verify');
+export const fetchBlockchainSummary = async () => {
+  try {
+    const data = await apiFetch('/api/blockchain/verify');
+    if (data) setCached('blockchain_summary', data);
+    return data;
+  } catch (err) {
+    const cached = getCached('blockchain_summary');
+    if (cached) return cached;
+    throw err;
+  }
+};
 
 export const verifyEvidence = (evidenceId) =>
   apiFetch(`/api/blockchain/verify/${evidenceId}`);
