@@ -47,6 +47,7 @@ export default function CommandCenter({ summaryData, attacks = [], loading: pare
   // Vulnerability Guard state
   const [vulnGuards, setVulnGuards] = useState([]);
   const [vulnLoading, setVulnLoading] = useState(false);
+  const [simFeedback, setSimFeedback] = useState('');
 
   // Accordion state
   const [openAccordion, setOpenAccordion] = useState({

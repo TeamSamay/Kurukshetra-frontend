@@ -317,9 +317,10 @@ export default function App() {
         }
 
         // F. Trigger Instant Alert Toast & Sound
-        const sourceIp = eventObj.source_ip || sessionDoc.source_ip || 'Unknown Attacker';
-        const svc = (eventObj.service || sessionDoc.service || 'HONEYPOT').toUpperCase();
-        const action = eventObj.event || eventObj.event_type || 'Interaction detected';
+        const sourceIp = String(eventObj.source_ip || sessionDoc.source_ip || 'Unknown Attacker');
+        const svc = String(eventObj.service || sessionDoc.service || 'HONEYPOT').toUpperCase();
+        const rawAction = eventObj.event || eventObj.event_type || 'Interaction detected';
+        const action = typeof rawAction === 'string' ? rawAction : (typeof rawAction === 'object' ? JSON.stringify(rawAction) : String(rawAction));
         const actLower = action.toLowerCase();
 
         const isNoise = actLower.includes('closed') || actLower.includes('disconnected') || actLower.includes('handshake') || actLower.includes('probe') || actLower.includes('-> 307') || actLower.includes('-> 200') || actLower.includes('get / ') || actLower.includes('get /login') || actLower.includes('started');
@@ -331,7 +332,7 @@ export default function App() {
 
     // 2. Live Session Containment Event
     if (data.type === 'SESSION_CONTAINED') {
-      const id = data.data?.session_id || data.session_id;
+      const id = String(data.data?.session_id || data.session_id || '');
       if (id) {
         setAttacks(prev => prev.map(a => (a.session_id === id ? { ...a, status: 'CONTAINED' } : a)));
         if (selectedIdRef.current === id) {
