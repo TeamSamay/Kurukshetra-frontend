@@ -47,7 +47,7 @@ function CopyBtn({ text }) {
   );
 }
 
-function IOCRow({ ioc }) {
+function IOCRow({ ioc, onSelectIp }) {
   const val = ioc.value || ioc.indicator || String(ioc);
   const type = ioc.ioc_type || ioc.type || 'unknown';
   const meta = getTypeMeta(type);
@@ -55,6 +55,7 @@ function IOCRow({ ioc }) {
   const sessionId = ioc.session_id || (Array.isArray(ioc.session_ids) ? ioc.session_ids[0] : null);
   const timeVal = ioc.last_seen || ioc.timestamp || ioc.first_seen;
   const threatCat = ioc.threat_category || 'SUSPICIOUS';
+  const isIp = ['ip', 'ipv4'].includes(type.toLowerCase());
 
   return (
     <tr className="hover:bg-neutral-50/70 group border-b border-neutral-100 transition-colors">
@@ -69,7 +70,18 @@ function IOCRow({ ioc }) {
       </td>
       <td className="px-5 py-3.5">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-xs font-bold text-neutral-900 break-all max-w-sm truncate" title={val}>{val}</span>
+          {isIp ? (
+            <button
+              onClick={() => onSelectIp && onSelectIp(val)}
+              className="font-mono text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline break-all max-w-sm truncate text-left cursor-pointer flex items-center gap-1"
+              title="Click for 360° Attacker Intelligence Dossier"
+            >
+              <span>{val}</span>
+              <Globe className="w-3 h-3 opacity-70" />
+            </button>
+          ) : (
+            <span className="font-mono text-xs font-bold text-neutral-900 break-all max-w-sm truncate" title={val}>{val}</span>
+          )}
           <CopyBtn text={val} />
         </div>
       </td>
@@ -103,7 +115,7 @@ function IOCRow({ ioc }) {
   );
 }
 
-export default function IOCIntelligence({ iocList = [] }) {
+export default function IOCIntelligence({ iocList = [], onSelectIp }) {
   const [query, setQuery] = useState('');
   const [filterType, setFilterType] = useState('ALL');
   const [exportNotice, setExportNotice] = useState('');
@@ -276,7 +288,7 @@ export default function IOCIntelligence({ iocList = [] }) {
               </thead>
               <tbody>
                 {filtered.map((ioc, i) => (
-                  <IOCRow key={ioc.id || i} ioc={ioc} />
+                  <IOCRow key={ioc.id || i} ioc={ioc} onSelectIp={onSelectIp} />
                 ))}
               </tbody>
             </table>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Component } from 'react';
 import Layout from './components/Layout';
 import CommandCenter from './components/CommandCenter';
 import LiveAttacks from './components/LiveAttacks';
@@ -8,6 +8,8 @@ import IOCIntelligence from './components/IOCIntelligence';
 import MitreAttack from './components/MitreAttack';
 import ThreatReport from './components/ThreatReport';
 import SafeSandboxTerminal from './components/SafeSandboxTerminal';
+import AttackerIntelModal from './components/AttackerIntelModal';
+import NotificationCenter from './components/NotificationCenter';
 
 import {
   fetchDashboardSummary, fetchAttacks, fetchSessionDetails,
@@ -15,7 +17,47 @@ import {
   getCached,
 } from './services/api';
 import { AttackWebSocketManager } from './services/websocket';
-import { ShieldAlert, Zap, Lock, X } from 'lucide-react';
+import { ShieldAlert, Zap, Lock, X, RefreshCw } from 'lucide-react';
+
+// ─── Error Boundary to Prevent White Screen ──────────────────────────────────
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('TRINETRA ErrorBoundary caught:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#f6f6f2] flex flex-col items-center justify-center p-6 text-center text-neutral-900">
+          <div className="w-16 h-16 rounded-3xl bg-rose-50 border border-rose-200 flex items-center justify-center mb-4">
+            <ShieldAlert className="w-8 h-8 text-rose-600" />
+          </div>
+          <h2 className="text-xl font-bold">TRINETRA Cyber Defense Grid Interface Protected</h2>
+          <p className="text-xs text-neutral-500 max-w-md mt-2">
+            A rendering exception was safely intercepted. Click below to restore live telemetry view.
+          </p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false });
+              window.location.reload();
+            }}
+            className="mt-5 px-5 py-2.5 rounded-full bg-neutral-900 text-white text-xs font-bold hover:bg-neutral-800 transition flex items-center gap-2 cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Reload Platform Interface</span>
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ─── Modern Enterprise Cyber Toast ──────────────────────────────────────────
 function Toast({ msg, title = 'SECURITY EVENT', onClose }) {
@@ -54,19 +96,21 @@ function Toast({ msg, title = 'SECURITY EVENT', onClose }) {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab]       = useState('command');
-  const [wsConnected, setWsConnected]   = useState(false);
-  const [summaryData, setSummaryData]   = useState(() => getCached('dashboard_summary') || {});
-  const [attacks, setAttacks]           = useState(() => getCached('attacks_list') || []);
-  const [selectedId, setSelectedId]     = useState(null);
-  const [sessionDetails, setSession]    = useState(null);
-  const [iocList, setIocList]           = useState(() => getCached('iocs_list') || []);
-  const [attackers, setAttackers]       = useState(() => getCached('attackers_list') || []);
-  const [mitreData, setMitreData]       = useState(() => getCached('mitre_list') || []);
-  const [reportData, setReportData]     = useState(null);
-  const [toasts, setToasts]             = useState([]);
-  const [loading, setLoading]           = useState(false);
-  const [showSandbox, setShowSandbox]   = useState(false);
+  const [activeTab, setActiveTab]             = useState('command');
+  const [wsConnected, setWsConnected]         = useState(false);
+  const [summaryData, setSummaryData]         = useState(() => getCached('dashboard_summary') || {});
+  const [attacks, setAttacks]                 = useState(() => getCached('attacks_list') || []);
+  const [selectedId, setSelectedId]           = useState(null);
+  const [sessionDetails, setSession]          = useState(null);
+  const [iocList, setIocList]                 = useState(() => getCached('iocs_list') || []);
+  const [attackers, setAttackers]             = useState(() => getCached('attackers_list') || []);
+  const [mitreData, setMitreData]             = useState(() => getCached('mitre_list') || []);
+  const [reportData, setReportData]           = useState(null);
+  const [toasts, setToasts]                   = useState([]);
+  const [loading, setLoading]                 = useState(false);
+  const [showSandbox, setShowSandbox]         = useState(false);
+  const [selectedIntelIp, setSelectedIntelIp] = useState(null);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const selectedIdRef = React.useRef(selectedId);
   selectedIdRef.current = selectedId;
@@ -327,17 +371,17 @@ export default function App() {
   const activeAttackCount = attacks.filter(a => (a.status || '').toUpperCase() === 'ACTIVE').length;
 
   const pages = {
-    command:       <CommandCenter summaryData={summaryData} attacks={attacks} loading={loading} onSelectAttack={handleSelectAttack} onContain={handleContain} />,
-    live:          <LiveAttacks attacks={attacks} onSelectAttack={handleSelectAttack} onContain={handleContain} />,
+    command:       <CommandCenter summaryData={summaryData} attacks={attacks} loading={loading} onSelectAttack={handleSelectAttack} onContain={handleContain} onSelectIp={setSelectedIntelIp} />,
+    live:          <LiveAttacks attacks={attacks} onSelectAttack={handleSelectAttack} onContain={handleContain} onSelectIp={setSelectedIntelIp} />,
     investigation: <AttackInvestigation sessionData={sessionDetails} onContainSession={handleContain} />,
     dna:           <AttackerDNA attackers={attackers} />,
-    ioc:           <IOCIntelligence iocList={iocList} />,
+    ioc:           <IOCIntelligence iocList={iocList} onSelectIp={setSelectedIntelIp} />,
     mitre:         <MitreAttack mitreData={mitreData} />,
-    report:        <ThreatReport reportData={reportData} onContainSession={handleContain} attacks={attacks} />,
+    report:        <ThreatReport reportData={reportData} onContainSession={handleContain} attacks={attacks} onSelectIp={setSelectedIntelIp} />,
   };
 
   return (
-    <>
+    <ErrorBoundary>
       {/* Toast Notifications */}
       <div className="fixed bottom-6 right-6 z-[200] space-y-2 pointer-events-none max-w-sm w-full print:hidden">
         {toasts.map(t => (
@@ -355,15 +399,38 @@ export default function App() {
         />
       )}
 
+      {/* 360-Degree Attacker IP Intelligence Modal */}
+      {selectedIntelIp && (
+        <AttackerIntelModal
+          ip={selectedIntelIp}
+          sessionData={sessionDetails}
+          attacks={attacks}
+          onClose={() => setSelectedIntelIp(null)}
+          onContain={handleContain}
+        />
+      )}
+
+      {/* Full Notification Center Drawer */}
+      <NotificationCenter
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        attacks={attacks}
+        onSelectAttack={handleSelectAttack}
+        onSelectIp={setSelectedIntelIp}
+        onClearAll={() => setAttacks(prev => prev.map(a => ({ ...a, status: 'CONTAINED' })))}
+      />
+
       <Layout
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         wsConnected={wsConnected}
         activeAttackCount={activeAttackCount}
         onOpenSandbox={() => setShowSandbox(true)}
+        onOpenNotifications={() => setShowNotifications(true)}
+        notificationCount={activeAttackCount || attacks.length || 3}
       >
         {pages[activeTab]}
       </Layout>
-    </>
+    </ErrorBoundary>
   );
 }

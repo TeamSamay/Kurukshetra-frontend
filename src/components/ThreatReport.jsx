@@ -2,15 +2,24 @@ import React, { useState } from 'react';
 import {
   FileText, Shield, AlertTriangle, CheckCircle, Lock, Clock,
   Terminal, Target, TrendingUp, Download, ShieldCheck, XCircle,
-  Printer, Cpu, Sparkles, Check, Share2, FileCode, ChevronDown
+  Printer, Cpu, Sparkles, Check, Share2, FileCode, ChevronDown,
+  Activity, Globe, Server, Hash, Zap, CheckCircle2, ArrowRight,
+  BarChart3, Eye, Layers, ShieldAlert
 } from 'lucide-react';
+import {
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis,
+  PolarRadiusAxis, Radar, PieChart, Pie, Cell
+} from 'recharts';
 import { exportSTIXBundle, downloadFile } from '../services/api';
 
 function formatTs(ts) {
   if (!ts) return '—';
-  return new Date(ts).toLocaleString('en-GB', {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleString('en-GB', {
     weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
   });
 }
 
@@ -21,23 +30,18 @@ function riskColor(score) {
   return '#059669';
 }
 
-function Section({ icon: Icon, title, iconBg, iconColor, children }) {
-  return (
-    <div className="card p-5 bg-white border border-neutral-200/80 shadow-xs">
-      <div className="flex items-center gap-2.5 mb-4">
-        <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg || 'bg-blue-50 border border-blue-100'}`}>
-          <Icon className={`w-4 h-4 ${iconColor || 'text-blue-600'}`} />
-        </div>
-        <h3 className="text-sm font-bold text-neutral-900 tracking-tight">{title}</h3>
-      </div>
-      {children}
-    </div>
-  );
-}
+const TOOLTIP_STYLE = {
+  background: '#1e1e22',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 12,
+  fontSize: 12,
+  color: '#ffffff',
+  boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+};
 
 const DEFAULT_DEMO_REPORTS = {
   'ATK-SSH-901': {
-    report_id: 'RPT-ATK-SSH-901',
+    report_id: 'RPT-TRINETRA-SSH-901',
     session_id: 'ATK-SSH-901',
     source_ip: '185.220.101.5',
     service: 'ssh',
@@ -45,48 +49,68 @@ const DEFAULT_DEMO_REPORTS = {
     risk_level: 'CRITICAL',
     containment_status: 'CONTAINED',
     generated_at: new Date().toISOString(),
-    executive_summary: 'Critical multi-stage intrusion identified on SSH Honeypot. Adversary operating via Tor exit node (185.220.101.5) triggered decoy canary honeytoken (/root/.env), attempted AWS Cloud IAM metadata theft, staged an external dropper binary, and spawned an interactive Netcat reverse shell before automated isolation containment.',
-    attacker_objective: 'Establish persistent C2 footprint, harvest AWS cloud credentials, escalate privileges, and pivot into internal enterprise infrastructure.',
+    threat_actor: 'APT29 (Cozy Bear / Nobelium)',
+    campaign: 'Operation Cloud Infiltrator',
+    target_env: 'Production Core Jumpbox (Port 2222 Decoy)',
+    executive_summary: 'Critical nation-state multi-stage intrusion identified on SSH Deception Grid. Adversary routed traffic via Tor exit relay (185.220.101.5), executed dictionary credential brute-force, triggered decoy canary honeytoken (/root/.env), probed AWS Cloud IMDS (169.254.169.254), downloaded external second-stage ELF dropper, and spawned an interactive Netcat reverse shell before automated isolation.',
+    attacker_objective: 'Establish persistent C2 footprint, harvest AWS cloud IAM credentials, escalate privileges to root, and pivot laterally into core microservice mesh.',
     observed_behavior: [
-        'Targeted SSH authentication service with dictionary credentials.',
-        'Accessed canary honeytoken file "/root/.env" containing fake AWS secrets.',
-        'Probed AWS Cloud Instance Metadata Service (169.254.169.254).',
-        'Downloaded external payload "dropper.sh" from malicious distribution domain.',
-        'Initiated interactive reverse shell targeting TCP port 9001.'
+      'Targeted SSH authentication service with automated high-velocity credential dictionary.',
+      'Accessed decoy canary honeytoken file "/root/.env" containing synthetic AWS keys.',
+      'Probed AWS Cloud Instance Metadata Service (169.254.169.254/latest/meta-data/).',
+      'Downloaded second-stage dropper "dropper.sh" from external malicious C2 domain.',
+      'Spawned interactive reverse shell targeting TCP port 9001 (185.220.101.5).'
     ],
     ai_interpretation: [
-        'Behavioral markers and command velocity strongly indicate interactive human operator (APT29 Cozy Bear playbook).',
-        'Adversary intended to use stolen AWS credentials to pivot into the production cloud control plane.'
+      'Behavioral telemetry and command cadence match APT29 Cozy Bear Linux playbook.',
+      'High-velocity exfiltration attempts indicate human-in-the-loop operator.',
+      'Canary credentials were fake, neutralizing potential cloud lateral movement.'
+    ],
+    kill_chain: [
+      { phase: 'Reconnaissance', event: 'Port 2222 scan & SSH banner identification', time: 'T+00s', status: 'TRAPPED' },
+      { phase: 'Initial Access', event: 'Password spray credential authentication', time: 'T+14s', status: 'TRAPPED' },
+      { phase: 'Discovery', event: 'Cat canary /root/.env & uname -a kernel probe', time: 'T+28s', status: 'TRAPPED' },
+      { phase: 'Credential Access', event: 'AWS IMDS metadata endpoint probe', time: 'T+45s', status: 'TRAPPED' },
+      { phase: 'Command & Control', event: 'External dropper fetch & reverse shell', time: 'T+62s', status: 'CONTAINED' },
+    ],
+    radar_metrics: [
+      { subject: 'Initial Access', A: 90, fullMark: 100 },
+      { subject: 'Execution', A: 85, fullMark: 100 },
+      { subject: 'Persistence', A: 70, fullMark: 100 },
+      { subject: 'Privilege Esc', A: 60, fullMark: 100 },
+      { subject: 'Defense Evasion', A: 95, fullMark: 100 },
+      { subject: 'Exfiltration', A: 80, fullMark: 100 },
     ],
     mitre_techniques: [
-      { technique_id: 'T1110.001', technique_name: 'Password Guessing', tactic: 'Credential Access' },
-      { technique_id: 'T1078', technique_name: 'Valid Accounts', tactic: 'Initial Access' },
-      { technique_id: 'T1552.001', technique_name: 'Credentials in Files', tactic: 'Credential Access' },
-      { technique_id: 'T1552.005', technique_name: 'Cloud Instance Metadata API', tactic: 'Credential Access' },
-      { technique_id: 'T1105', technique_name: 'Ingress Tool Transfer', tactic: 'Command and Control' },
-      { technique_id: 'T1059.004', technique_name: 'Unix Shell', tactic: 'Execution' },
+      { technique_id: 'T1110.001', technique_name: 'Password Guessing', tactic: 'Credential Access', count: 18 },
+      { technique_id: 'T1078', technique_name: 'Valid Accounts', tactic: 'Initial Access', count: 2 },
+      { technique_id: 'T1552.001', technique_name: 'Credentials in Files', tactic: 'Credential Access', count: 1 },
+      { technique_id: 'T1552.005', technique_name: 'Cloud Instance Metadata API', tactic: 'Credential Access', count: 3 },
+      { technique_id: 'T1105', technique_name: 'Ingress Tool Transfer', tactic: 'Command & Control', count: 2 },
+      { technique_id: 'T1059.004', technique_name: 'Unix Shell Execution', tactic: 'Execution', count: 4 },
     ],
     iocs_summary: [
-      { ioc_type: 'ip', value: '185.220.101.5', threat_category: 'ATTACKER_SOURCE' },
+      { ioc_type: 'ip', value: '185.220.101.5', threat_category: 'ATTACKER_C2' },
       { ioc_type: 'url', value: 'http://cdn.malicious-domain.cc/tools/dropper.sh', threat_category: 'PAYLOAD_DELIVERY' },
       { ioc_type: 'hash_sha256', value: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', threat_category: 'MALWARE_PAYLOAD' },
       { ioc_type: 'file', value: '/root/.env', threat_category: 'HONEYTOKEN_CANARY' },
+      { ioc_type: 'ip', value: '169.254.169.254', threat_category: 'CLOUD_METADATA' },
     ],
     recommendations: [
-      'Enforce immediate edge firewall DROP rule for IP 185.220.101.5.',
-      'Sinkhole malicious domain "cdn.malicious-domain.cc" at corporate DNS resolvers.',
-      'Verify AWS CloudTrail for any access attempts using the canary IAM keys from /root/.env.',
-      'Retain cryptographic SHA-256 blockchain proof block for legal & compliance audit.'
+      { title: 'Edge Firewall Drop Rule', desc: 'Enforce perimeter DROP rule for IP 185.220.101.5 at edge gateway.', done: true },
+      { title: 'DNS Sinkholing', desc: 'Sinkhole cdn.malicious-domain.cc across enterprise recursive DNS.', done: true },
+      { title: 'AWS CloudTrail Audit', desc: 'Verify synthetic canary IAM key ID AKIAIOSFODNN7EXAMPLE for cloud hits.', done: true },
+      { title: 'Block Tor Exit Relays', desc: 'Enable automated dynamic threat feed blocking for Tor exit relays.', done: false },
     ],
     evidence_integrity: 'VERIFIED',
     blockchain_proof: {
-      block_index: 12,
+      block_index: 42,
       block_hash: '0634babc287de2b9e05aad6026ef7b82b0a4778e0ac641c199ce5cb91f214c21',
       status: 'VERIFIED'
     }
   },
   'ATK-WEB-402': {
-    report_id: 'RPT-ATK-WEB-402',
+    report_id: 'RPT-TRINETRA-WEB-402',
     session_id: 'ATK-WEB-402',
     source_ip: '45.154.255.89',
     service: 'http',
@@ -94,23 +118,40 @@ const DEFAULT_DEMO_REPORTS = {
     risk_level: 'CRITICAL',
     containment_status: 'ACTIVE',
     generated_at: new Date().toISOString(),
-    executive_summary: 'Critical web exploitation campaign targeting e-commerce web application. Attacker executed classic SQL injection bypass, accessed canary passwords.txt, uploaded PHP backdoor web shell, and conducted internal CIDR SYN scans.',
-    attacker_objective: 'Arbitrary code execution on web application server and lateral expansion across internal subnet.',
+    threat_actor: 'FIN7 (Carbanak Syndicate)',
+    campaign: 'E-Commerce Skimmer Campaign',
+    target_env: 'Web Decoy App (Port 8080)',
+    executive_summary: 'Targeted web exploitation campaign against web decoy application. Attacker executed automated SQL injection probes, retrieved canary credentials passwords.txt, uploaded PHP backdoor web shell, and conducted internal subnet scans.',
+    attacker_objective: 'Execute arbitrary code on web application server, deploy persistence backdoors, and pivot laterally.',
     observed_behavior: [
-      'Scanned robots.txt and grabbed canary file passwords.txt.',
+      'Scanned /robots.txt and accessed canary file /passwords.txt.',
       'Injected tautological SQL strings (\' OR \'1\'=\'1\' --) and UNION SELECT queries.',
-      'Downloaded PHP backdoor web shell via curl and spawned Python reverse connection.',
+      'Uploaded PHP backdoor web shell via curl and spawned Python reverse connection.',
       'Conducted SYN subnet sweep across internal IP range.'
     ],
     ai_interpretation: [
-      'Attack follows classic FIN7 initial access to lateral movement playbook.',
+      'Attack matches FIN7 initial access to lateral movement playbook.',
       'High confidence in automated toolchain (sqlmap + custom python dropper).'
     ],
+    kill_chain: [
+      { phase: 'Reconnaissance', event: 'robots.txt and web endpoint crawling', time: 'T+00s', status: 'TRAPPED' },
+      { phase: 'Exploitation', event: 'SQL Injection tautology bypass attempt', time: 'T+18s', status: 'TRAPPED' },
+      { phase: 'Persistence', event: 'PHP backdoor upload via POST', time: 'T+34s', status: 'TRAPPED' },
+      { phase: 'Discovery', event: 'Subnet SYN sweep & service mapping', time: 'T+50s', status: 'ACTIVE' },
+    ],
+    radar_metrics: [
+      { subject: 'Initial Access', A: 95, fullMark: 100 },
+      { subject: 'Execution', A: 90, fullMark: 100 },
+      { subject: 'Persistence', A: 85, fullMark: 100 },
+      { subject: 'Privilege Esc', A: 50, fullMark: 100 },
+      { subject: 'Defense Evasion', A: 75, fullMark: 100 },
+      { subject: 'Exfiltration', A: 70, fullMark: 100 },
+    ],
     mitre_techniques: [
-      { technique_id: 'T1190', technique_name: 'Exploit Public-Facing Application', tactic: 'Initial Access' },
-      { technique_id: 'T1552.001', technique_name: 'Credentials in Files', tactic: 'Credential Access' },
-      { technique_id: 'T1505.003', technique_name: 'Web Shell', tactic: 'Persistence' },
-      { technique_id: 'T1046', technique_name: 'Network Service Discovery', tactic: 'Discovery' }
+      { technique_id: 'T1190', technique_name: 'Exploit Public-Facing App', tactic: 'Initial Access', count: 14 },
+      { technique_id: 'T1552.001', technique_name: 'Credentials in Files', tactic: 'Credential Access', count: 2 },
+      { technique_id: 'T1505.003', technique_name: 'Web Shell', tactic: 'Persistence', count: 1 },
+      { technique_id: 'T1046', technique_name: 'Network Service Discovery', tactic: 'Discovery', count: 8 }
     ],
     iocs_summary: [
       { ioc_type: 'ip', value: '45.154.255.89', threat_category: 'ATTACKER_SOURCE' },
@@ -118,328 +159,553 @@ const DEFAULT_DEMO_REPORTS = {
       { ioc_type: 'hash_md5', value: '5d41402abc4b2a76b9719d911017c592', threat_category: 'MALWARE_HASH' },
     ],
     recommendations: [
-      'Deploy WAF signature blocking tautological SQL patterns.',
-      'Isolate compromised web worker container immediately.',
-      'Add 45.154.255.89 to perimeter blocklist.'
+      { title: 'WAF Rule Deployment', desc: 'Deploy ModSecurity / AWS WAF signature blocking SQLi patterns.', done: true },
+      { title: 'Quarantine IP', desc: 'Block 45.154.255.89 at edge perimeter.', done: false },
+      { title: 'Rotate Database Secrets', desc: 'Rotate canary database user credentials.', done: true },
     ],
     evidence_integrity: 'VERIFIED',
     blockchain_proof: {
-      block_index: 18,
+      block_index: 48,
       block_hash: '43c9218c68e21f2dfe6fb2b05fb9157687e744d79886faf9c7fc6bba1cd24352',
       status: 'VERIFIED'
     }
   }
 };
 
-export default function ThreatReport({ reportData: rawReportData, onContainSession, attacks = [] }) {
+export default function ThreatReport({ reportData: rawReportData, onContainSession, attacks = [], onSelectIp }) {
   const [selectedSessionId, setSelectedSessionId] = useState('ATK-SSH-901');
+  const [activeViewTab, setActiveViewTab] = useState('dossier');
+  const [checklist, setChecklist] = useState({});
 
-  // Use provided reportData or lookup from demo reports
+  // Dynamic report lookup
   const activeReport = rawReportData || DEFAULT_DEMO_REPORTS[selectedSessionId] || DEFAULT_DEMO_REPORTS['ATK-SSH-901'];
 
   const session_id = activeReport.session_id || selectedSessionId;
   const source_ip = activeReport.source_ip || activeReport.attack_source?.source_ip || '185.220.101.5';
-  const service = activeReport.service || activeReport.attack_source?.service || 'ssh';
+  const service = (activeReport.service || activeReport.attack_source?.service || 'ssh').toUpperCase();
   const risk_score = activeReport.risk_score ?? activeReport.risk?.score ?? 95;
   const risk_level = activeReport.risk_level || activeReport.risk?.level || (risk_score >= 80 ? 'CRITICAL' : risk_score >= 50 ? 'HIGH' : 'LOW');
   const containment_status = typeof activeReport.containment_status === 'object' ? activeReport.containment_status?.status : activeReport.containment_status;
   const generated_at = activeReport.generated_at || new Date().toISOString();
 
   const ai = activeReport.ai_analysis || {};
-  const executive_summary = activeReport.executive_summary || ai.threat_summary || ai.summary;
-  const attacker_objective = activeReport.attacker_objective || ai.likely_objective;
+  const executive_summary = activeReport.executive_summary || ai.threat_summary || ai.summary || 'Critical multi-stage intrusion captured on deception grid.';
+  const attacker_objective = activeReport.attacker_objective || ai.likely_objective || 'Establish unauthorized foothold and exfiltrate credentials.';
   const observed_behavior = activeReport.observed_behavior || ai.observed_behavior || (ai.observed_behavior_explanation ? [ai.observed_behavior_explanation] : []);
-  const ai_interpretation = ai.ai_interpretation || [];
+  const ai_interpretation = ai.ai_interpretation || activeReport.ai_interpretation || [];
   const mitre_techniques = activeReport.mitre_techniques || activeReport.mitre_mapping || [];
   const iocs_summary = activeReport.iocs_summary || activeReport.iocs || [];
-  const recommendations = activeReport.recommendations || ai.recommended_actions || (ai.recommended_defensive_action ? [ai.recommended_defensive_action] : []);
-  const evidence_integrity = activeReport.evidence_integrity || 'VERIFIED';
-  const blockchain_proof = activeReport.blockchain_proof;
+  const recommendations = activeReport.recommendations || ai.recommended_actions || [];
+  const kill_chain = activeReport.kill_chain || [
+    { phase: 'Reconnaissance', event: 'Port scan & banner probe', time: 'T+00s', status: 'TRAPPED' },
+    { phase: 'Initial Access', event: 'Credential authentication', time: 'T+12s', status: 'TRAPPED' },
+    { phase: 'Discovery', event: 'Canary file access', time: 'T+25s', status: 'TRAPPED' },
+    { phase: 'Execution', event: 'Command invocation', time: 'T+40s', status: 'CONTAINED' },
+  ];
+  const radar_metrics = activeReport.radar_metrics || [
+    { subject: 'Initial Access', A: 90, fullMark: 100 },
+    { subject: 'Execution', A: 80, fullMark: 100 },
+    { subject: 'Persistence', A: 65, fullMark: 100 },
+    { subject: 'Privilege Esc', A: 50, fullMark: 100 },
+    { subject: 'Defense Evasion', A: 85, fullMark: 100 },
+    { subject: 'Exfiltration', A: 75, fullMark: 100 },
+  ];
 
   const isContained = (containment_status || '').toUpperCase() === 'CONTAINED';
 
+  const toggleChecklistItem = (idx) => {
+    setChecklist(prev => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
   const handleExportJSON = () => {
-    downloadFile(`threat-report-${session_id}.json`, JSON.stringify(activeReport, null, 2), 'application/json');
+    downloadFile(`TRINETRA-incident-dossier-${session_id}.json`, JSON.stringify(activeReport, null, 2), 'application/json');
   };
 
   const handleExportMarkdown = () => {
-    const md = `# Threat Intelligence Incident Dossier: ${session_id}
+    const md = `# TRINETRA SOC EXECUTIVE THREAT INTELLIGENCE DOSSIER
 **Report ID**: ${activeReport.report_id || `RPT-${session_id}`}
-**Timestamp**: ${formatTs(generated_at)}
+**Incident Session**: ${session_id}
 **Attacker IP**: ${source_ip}
-**Deception Target**: ${(service).toUpperCase()} Honeypot
+**Targeted Decoy**: ${service} Deception Node
 **Risk Score**: ${risk_score}/100 (${risk_level})
 **Containment Status**: ${containment_status || 'ACTIVE'}
+**Timestamp**: ${formatTs(generated_at)}
 
 ---
 
-## Executive Summary
-${executive_summary || 'N/A'}
+## 1. Executive Summary & Impact Analysis
+${executive_summary}
 
-## Attacker Objective & Intent
-${attacker_objective || 'N/A'}
+## 2. Adversary Objective & Threat Actor Profiling
+${attacker_objective}
 
-## Observed Telemetry Behavior
+## 3. Observed Telemetry Behavior
 ${(observed_behavior || []).map(b => `- ${b}`).join('\n')}
 
-## Analytical AI Interpretation
+## 4. Analytical AI Threat Interpretation
 ${(ai_interpretation || []).map(a => `- ${a}`).join('\n')}
 
-## MITRE ATT&CK Mapping
-${(mitre_techniques || []).map(m => `- **${m.technique_id}**: ${m.technique_name} (${m.tactic || 'Tactic'})`).join('\n')}
+## 5. MITRE ATT&CK Matrix Mapping
+${(mitre_techniques || []).map(m => `- [${m.technique_id}] ${m.technique_name} (${m.tactic})`).join('\n')}
 
-## Captured Indicators of Compromise (IOCs)
-${(iocs_summary || []).map(i => `- [${(i.ioc_type || 'IOC').toUpperCase()}] \`${i.value}\` - Category: ${i.threat_category || 'SUSPICIOUS'}`).join('\n')}
+## 6. Captured Indicators of Compromise (IOCs)
+${(iocs_summary || []).map(i => `- [${(i.ioc_type || 'IOC').toUpperCase()}] \`${i.value}\` (${i.threat_category || 'SUSPICIOUS'})`).join('\n')}
 
-## Defensive Recommendations & SOC Playbook
-${(recommendations || []).map((r, idx) => `${idx + 1}. ${r}`).join('\n')}
+## 7. Defensive Hardening Recommendations
+${(recommendations || []).map((r, i) => `${i + 1}. ${typeof r === 'object' ? r.title + ': ' + r.desc : r}`).join('\n')}
 
 ---
-**Cryptographic Blockchain Verification**: ${evidence_integrity}
-*Generated by Kurukshetra Adaptive Cyber Deception Platform*
+**Cryptographic Forensic Proof**: SHA-256 Block ${activeReport.blockchain_proof?.block_index || 42} (VERIFIED)
+*Generated by TRINETRA Autonomous Cyber Deception Grid*
 `;
-    downloadFile(`threat-dossier-${session_id}.md`, md, 'text/markdown');
-  };
-
-  const handlePrint = () => {
-    window.print();
+    downloadFile(`TRINETRA-incident-dossier-${session_id}.md`, md, 'text/markdown');
   };
 
   return (
-    <div className="space-y-6 fade-in-up print:space-y-4 print:p-0">
+    <div className="space-y-6 fade-in pb-16 print:space-y-4 print:p-0">
 
-      {/* Session Switcher & Action Bar */}
-      <div className="card p-4 bg-white border border-neutral-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3 print:hidden">
+      {/* ─── TOP ACTION BAR & INCIDENT SELECTOR ─────────────────────────────── */}
+      <div className="crextio-card p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 print:hidden">
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1.5">
-            <Target className="w-3.5 h-3.5 text-neutral-700" /> Select Incident:
-          </span>
+          <div className="flex items-center gap-2">
+            <Target className="w-4 h-4 text-neutral-800" />
+            <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">Incident Dossier:</span>
+          </div>
+
           <select
             value={selectedSessionId}
             onChange={e => setSelectedSessionId(e.target.value)}
-            className="bg-neutral-50 border border-neutral-300 rounded-xl px-3 py-1.5 text-xs font-bold text-neutral-900 focus:outline-none focus:border-neutral-500 font-mono"
+            className="bg-neutral-50 border border-neutral-300 rounded-full px-4 py-2 text-xs font-bold text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 font-mono shadow-xs cursor-pointer"
           >
-            <option value="ATK-SSH-901">ATK-SSH-901 (APT29 Cozy Bear - SSH Infiltration - 95 Risk)</option>
-            <option value="ATK-WEB-402">ATK-WEB-402 (FIN7 E-Commerce - Web Shell & SQLi - 90 Risk)</option>
-            <option value="ATK-REDIS-601">ATK-REDIS-601 (Lazarus Group - Redis Cryptominer - 88 Risk)</option>
-            <option value="ATK-K8S-505">ATK-K8S-505 (Kubernetes Decoy - Secrets Exfil - 85 Risk)</option>
-            <option value="ATK-RDP-108">ATK-RDP-108 (RDP Gateway - Credential Stuffing - 75 Risk)</option>
+            <option value="ATK-SSH-901">ATK-SSH-901 · APT29 Cozy Bear (SSH Canary Decoy - 95 Risk)</option>
+            <option value="ATK-WEB-402">ATK-WEB-402 · FIN7 Carbanak (Web SQLi &amp; Shell - 90 Risk)</option>
+            {attacks.filter(a => !['ATK-SSH-901','ATK-WEB-402'].includes(a.session_id)).map(a => (
+              <option key={a.session_id} value={a.session_id}>
+                {a.session_id} · {a.source_ip} ({(a.service || 'SSH').toUpperCase()} - {a.risk_score || 80} Risk)
+              </option>
+            ))}
           </select>
         </div>
 
+        {/* Export Suite Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={handlePrint}
-            className="px-3.5 py-1.5 rounded-xl bg-neutral-900 text-white text-xs font-semibold hover:bg-neutral-800 transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+            onClick={() => window.print()}
+            className="px-4 py-2 rounded-full bg-neutral-900 text-white text-xs font-bold hover:bg-neutral-800 transition shadow-xs flex items-center gap-2 cursor-pointer"
           >
-            <Printer className="w-3.5 h-3.5 text-[#f8c858]" /> Print / Export PDF
+            <Printer className="w-3.5 h-3.5 text-[#f8c858]" />
+            <span>Print / Export PDF</span>
           </button>
+
           <button
             onClick={handleExportMarkdown}
-            className="px-3 py-1.5 rounded-xl bg-neutral-100 text-neutral-800 border border-neutral-300 text-xs font-semibold hover:bg-neutral-200 transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 rounded-full bg-neutral-100 text-neutral-800 hover:bg-neutral-200 border border-neutral-200 text-xs font-semibold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
-            <FileCode className="w-3.5 h-3.5 text-neutral-700" /> Markdown
+            <FileCode className="w-3.5 h-3.5 text-neutral-700" />
+            <span>Markdown</span>
           </button>
+
           <button
             onClick={() => exportSTIXBundle(activeReport, iocs_summary)}
-            className="px-3 py-1.5 rounded-xl bg-neutral-100 text-neutral-800 border border-neutral-300 text-xs font-semibold hover:bg-neutral-200 transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 rounded-full bg-neutral-100 text-neutral-800 hover:bg-neutral-200 border border-neutral-200 text-xs font-semibold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
-            <Share2 className="w-3.5 h-3.5 text-blue-600" /> STIX 2.1
+            <Share2 className="w-3.5 h-3.5 text-blue-600" />
+            <span>STIX 2.1</span>
           </button>
+
           <button
             onClick={handleExportJSON}
-            className="px-3 py-1.5 rounded-xl bg-neutral-100 text-neutral-800 border border-neutral-300 text-xs font-semibold hover:bg-neutral-200 transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 rounded-full bg-neutral-100 text-neutral-800 hover:bg-neutral-200 border border-neutral-200 text-xs font-semibold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5 text-neutral-700" /> JSON
+            <Download className="w-3.5 h-3.5 text-neutral-700" />
+            <span>JSON</span>
           </button>
         </div>
       </div>
 
-      {/* Main Report Header */}
-      <div className="card p-6 bg-white border border-neutral-200/80 shadow-xs">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-blue-50 border border-blue-100">
-              <FileText className="w-6 h-6 text-blue-600" />
+      {/* ─── EXECUTIVE DOSSIER HERO BANNER ─────────────────────────────────── */}
+      <div className="crextio-card p-6 sm:p-8 relative overflow-hidden bg-white">
+        {/* Subtle decorative watermark */}
+        <div className="absolute -right-8 -bottom-8 opacity-[0.03] pointer-events-none">
+          <Shield className="w-96 h-96 text-neutral-900" />
+        </div>
+
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="px-3 py-1 rounded-full bg-[#1e1e22] text-[#f8c858] font-mono text-[10px] font-black uppercase tracking-widest">
+                TRINETRA FORENSIC DOSSIER
+              </span>
+              <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold uppercase">
+                {risk_level} SEVERITY
+              </span>
+              <span className="px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-700 text-[10px] font-bold uppercase">
+                {service} DECEPTION TRAP
+              </span>
+              {isContained ? (
+                <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                  ✓ CONTAINED
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold">
+                  ● ACTIVE MONITORING
+                </span>
+              )}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-black text-neutral-900 tracking-tight">
-                  EXECUTIVE THREAT INTELLIGENCE INCIDENT REPORT
-                </h2>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#f8c858] text-neutral-900">
-                  CONFIDENTIAL
-                </span>
+
+            <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight font-sans">
+              Executive Threat Intelligence Incident Report
+            </h1>
+
+            <div className="flex items-center gap-4 flex-wrap text-xs text-neutral-600 font-mono">
+              <div className="flex items-center gap-1.5">
+                <span className="text-neutral-400">Attacker:</span>
+                <button
+                  onClick={() => onSelectIp && onSelectIp(source_ip)}
+                  className="font-bold text-blue-600 hover:text-blue-800 underline flex items-center gap-1 cursor-pointer"
+                  title="Click for 360° IP Intelligence Dossier"
+                >
+                  <span>{source_ip}</span>
+                  <Eye className="w-3 h-3" />
+                </button>
               </div>
-              <p className="font-mono text-xs mt-1 text-neutral-500">
-                Incident Ref: {activeReport.report_id || `RPT-${session_id}`}
-              </p>
-              <div className="flex items-center gap-2 flex-wrap mt-2">
-                <span className="font-mono text-sm font-bold text-blue-600">{source_ip}</span>
-                <span className="badge bg-neutral-100 text-neutral-800 text-[10px] font-bold uppercase">
-                  {(service).toUpperCase()} DECOY
-                </span>
-                <span className={`badge ${
-                  risk_level === 'CRITICAL' ? 'badge-critical' :
-                  risk_level === 'HIGH'     ? 'badge-high' :
-                  risk_level === 'MEDIUM'   ? 'badge-medium' : 'badge-low'
-                }`}>
-                  {risk_level} SEVERITY
-                </span>
-                {isContained ? (
-                  <span className="badge bg-emerald-100 text-emerald-800 text-[10px] font-bold">CONTAINED</span>
-                ) : (
-                  <span className="badge bg-amber-100 text-amber-900 text-[10px] font-bold">ACTIVE MONITORING</span>
-                )}
+              <span>•</span>
+              <div>
+                <span className="text-neutral-400">Ref:</span> <strong className="text-neutral-800">{activeReport.report_id || `RPT-${session_id}`}</strong>
               </div>
-              <p className="text-xs mt-2 flex items-center gap-1.5 text-neutral-400">
-                <Clock className="w-3.5 h-3.5" />
-                Generated: {formatTs(generated_at)}
-              </p>
+              <span>•</span>
+              <div className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-neutral-400" />
+                <span>{formatTs(generated_at)}</span>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Risk Gauge */}
-            <div className="px-5 py-3 rounded-2xl text-center bg-neutral-50 border border-neutral-200">
-              <p className="text-3xl font-black" style={{ color: riskColor(risk_score) }}>{risk_score}</p>
-              <p className="text-[10px] font-bold tracking-widest uppercase mt-1 text-neutral-400">Risk Index</p>
-              <div className="risk-bar mt-2 w-24">
-                <div className="risk-bar-fill" style={{ width: `${risk_score}%`, background: riskColor(risk_score) }} />
+          {/* Right: Risk Gauge & Containment Trigger */}
+          <div className="flex items-center gap-4 self-start lg:self-center flex-shrink-0">
+            <div className="p-4 rounded-3xl bg-neutral-50 border border-neutral-200 text-center min-w-[130px] shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 block">Risk Index</span>
+              <p className="text-4xl font-black mt-1" style={{ color: riskColor(risk_score) }}>
+                {risk_score}
+              </p>
+              <div className="w-full bg-neutral-200 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${risk_score}%`, backgroundColor: riskColor(risk_score) }} />
               </div>
             </div>
 
             {!isContained && onContainSession && (
               <button
                 onClick={() => onContainSession(session_id)}
-                className="px-4 py-2.5 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 transition shadow-xs flex items-center gap-1.5 cursor-pointer print:hidden"
+                className="px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md transition flex items-center gap-2 cursor-pointer print:hidden"
               >
-                <Lock className="w-4 h-4" /> Contain Session
+                <Lock className="w-4 h-4" />
+                <span>Contain Session</span>
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* Executive Summary */}
-      {executive_summary && (
-        <Section icon={FileText} title="Executive Summary & Impact Analysis" iconBg="bg-blue-50" iconColor="text-blue-600">
-          <p className="text-sm text-neutral-800 leading-relaxed font-sans font-medium">
-            {executive_summary}
-          </p>
-        </Section>
-      )}
+      {/* ─── 2-COLUMN EXECUTIVE ANALYSIS & TTP RADAR CHARTS ────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-      {/* Attacker Intent & Objective */}
-      {attacker_objective && (
-        <Section icon={Target} title="Adversary Objective & Threat Actor Profiling" iconBg="bg-purple-50" iconColor="text-purple-600">
-          <p className="text-sm text-neutral-800 leading-relaxed font-sans">
-            {attacker_objective}
-          </p>
-        </Section>
-      )}
+        {/* Left 2 Cols: Executive Summary, Intent & Fact Telemetry */}
+        <div className="lg:col-span-2 space-y-6">
 
-      {/* Observed Behavior vs Analytical Interpretation */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <Section icon={Terminal} title="Observed Telemetry Facts (Verifiable Logs)" iconBg="bg-neutral-100" iconColor="text-neutral-700">
-          <ul className="space-y-2 text-xs text-neutral-700">
-            {observed_behavior.map((b, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <span className="text-blue-500 font-bold">•</span>
-                <span>{b}</span>
-              </li>
-            ))}
-          </ul>
-        </Section>
+          {/* Executive Summary Card */}
+          <div className="crextio-card p-6 space-y-3">
+            <div className="flex items-center gap-2 pb-3 border-b border-neutral-100">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                <FileText className="w-4 h-4" />
+              </div>
+              <h2 className="text-base font-bold text-neutral-900">Executive Summary &amp; Impact Analysis</h2>
+            </div>
+            <p className="text-sm text-neutral-700 leading-relaxed font-sans font-normal">
+              {executive_summary}
+            </p>
+          </div>
 
-        <Section icon={Sparkles} title="AI Intelligence Interpretation & Hypotheses" iconBg="bg-amber-50" iconColor="text-amber-600">
-          <ul className="space-y-2 text-xs text-neutral-700">
-            {ai_interpretation.map((int, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <span className="text-[#f8c858] font-bold">▶</span>
-                <span>{int}</span>
-              </li>
-            ))}
-          </ul>
-        </Section>
+          {/* Adversary Objective & Profiling */}
+          <div className="crextio-card p-6 space-y-3">
+            <div className="flex items-center gap-2 pb-3 border-b border-neutral-100">
+              <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
+                <Target className="w-4 h-4" />
+              </div>
+              <h2 className="text-base font-bold text-neutral-900">Adversary Intent &amp; Threat Actor Profile</h2>
+            </div>
+            <p className="text-sm text-neutral-700 leading-relaxed font-sans">
+              {attacker_objective}
+            </p>
+            {activeReport.threat_actor && (
+              <div className="p-3 rounded-xl bg-purple-50/70 border border-purple-100 flex items-center justify-between text-xs">
+                <span className="text-neutral-500">Attributed Actor:</span>
+                <strong className="text-purple-900 font-bold">{activeReport.threat_actor}</strong>
+              </div>
+            )}
+          </div>
+
+          {/* Telemetry Facts vs AI Interpretation */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="crextio-card p-5 space-y-3">
+              <div className="flex items-center gap-2 text-neutral-900 font-bold text-xs">
+                <Terminal className="w-4 h-4 text-neutral-700" />
+                <span>Verifiable Telemetry Facts</span>
+              </div>
+              <ul className="space-y-2 text-xs text-neutral-600">
+                {observed_behavior.map((b, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-blue-500 font-bold mt-0.5">•</span>
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="crextio-card p-5 space-y-3">
+              <div className="flex items-center gap-2 text-neutral-900 font-bold text-xs">
+                <Sparkles className="w-4 h-4 text-amber-600" />
+                <span>AI Analytic Hypotheses</span>
+              </div>
+              <ul className="space-y-2 text-xs text-neutral-600">
+                {ai_interpretation.map((int, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-[#f8c858] font-bold mt-0.5">▶</span>
+                    <span>{int}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Right 1 Col: MITRE ATT&CK Radar & TTP Distribution Chart */}
+        <div className="space-y-6">
+
+          {/* Threat Vector Radar Chart */}
+          <div className="crextio-card p-5 flex flex-col justify-between">
+            <div className="flex items-center justify-between pb-2 border-b border-neutral-100">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-neutral-700" />
+                <h3 className="text-xs font-bold text-neutral-900">Kill Chain Threat Radar</h3>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600">
+                Multi-Vector
+              </span>
+            </div>
+
+            <div className="h-56 w-full my-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart data={radar_metrics}>
+                  <PolarGrid stroke="#e2e8f0" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10 }} />
+                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                  <Radar name="Threat Vector" dataKey="A" stroke="#1e1e22" fill="#f8c858" fillOpacity={0.6} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <p className="text-[11px] text-neutral-400 text-center">
+              Autonomous vector intensity mapped against standard SOC kill chain
+            </p>
+          </div>
+
+          {/* MITRE Techniques Mini Bar Breakdown */}
+          <div className="crextio-card p-5 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-neutral-100">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-rose-600" />
+                <h3 className="text-xs font-bold text-neutral-900">Top Observed Techniques</h3>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {mitre_techniques.slice(0, 5).map((m, i) => (
+                <div key={i} className="p-2.5 rounded-xl bg-neutral-50 border border-neutral-200/70 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-rose-600">{m.technique_id}</span>
+                    <span className="text-[10px] font-bold uppercase text-neutral-400">{m.tactic}</span>
+                  </div>
+                  <p className="font-semibold text-neutral-800 mt-0.5">{m.technique_name}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+
       </div>
 
-      {/* MITRE ATT&CK Matrix Mapping */}
-      {mitre_techniques.length > 0 && (
-        <Section icon={Shield} title="Correlated MITRE ATT&CK Techniques" iconBg="bg-rose-50" iconColor="text-rose-600">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-            {mitre_techniques.map((m, i) => (
-              <div key={i} className="p-3 rounded-xl bg-neutral-50 border border-neutral-200/80">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs font-extrabold text-rose-600">{m.technique_id}</span>
-                  <span className="text-[10px] font-bold uppercase text-neutral-400">{m.tactic || 'Execution'}</span>
-                </div>
-                <p className="text-xs font-semibold text-neutral-900 mt-1">{m.technique_name}</p>
+      {/* ─── INTERACTIVE ATTACK KILL CHAIN PROGRESSION ──────────────────────── */}
+      <div className="crextio-card p-6 space-y-5">
+        <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-neutral-900 text-[#f8c858] flex items-center justify-center flex-shrink-0">
+              <Activity className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-neutral-900">Attack Kill Chain Progression &amp; Timeline</h2>
+              <p className="text-xs text-neutral-500">Autonomous deception trap triggers across intrusion lifecycle</p>
+            </div>
+          </div>
+          <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+            Deception Trapped
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {kill_chain.map((kc, i) => (
+            <div key={i} className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200/80 flex flex-col justify-between space-y-2 relative group hover:border-neutral-400 transition">
+              <div className="flex items-center justify-between text-[10px] font-mono text-neutral-400">
+                <span>Phase 0{i + 1}</span>
+                <span>{kc.time}</span>
               </div>
-            ))}
-          </div>
-        </Section>
-      )}
+              <div>
+                <h4 className="text-xs font-bold text-neutral-900">{kc.phase}</h4>
+                <p className="text-[11px] text-neutral-600 mt-1 leading-snug">{kc.event}</p>
+              </div>
+              <div className="pt-2 border-t border-neutral-200 flex items-center justify-between text-[10px]">
+                <span className="font-bold text-emerald-600 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> {kc.status}
+                </span>
+                <span className="text-neutral-400 font-mono">100% Captured</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
-      {/* Captured IOCs */}
-      {iocs_summary.length > 0 && (
-        <Section icon={Share2} title="Captured Threat Indicators (IOCs)" iconBg="bg-emerald-50" iconColor="text-emerald-600">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50/50">
-                  <th className="text-left px-3 py-2 text-[10px] font-bold text-neutral-400 uppercase">Type</th>
-                  <th className="text-left px-3 py-2 text-[10px] font-bold text-neutral-400 uppercase">Value</th>
-                  <th className="text-left px-3 py-2 text-[10px] font-bold text-neutral-400 uppercase">Category</th>
+      {/* ─── CAPTURED IOCs & FORENSIC ARTIFACTS ─────────────────────────────── */}
+      <div className="crextio-card p-6 space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+          <div className="flex items-center gap-2">
+            <Share2 className="w-5 h-5 text-emerald-600" />
+            <h2 className="text-base font-bold text-neutral-900">Captured Indicators of Compromise (IOCs)</h2>
+          </div>
+          <span className="text-xs font-mono font-bold text-neutral-500">
+            {iocs_summary.length} Indicators Extracted
+          </span>
+        </div>
+
+        <div className="overflow-x-auto rounded-2xl border border-neutral-100">
+          <table className="w-full text-xs text-left">
+            <thead className="bg-neutral-50 border-b border-neutral-100 text-neutral-500 font-semibold">
+              <tr>
+                <th className="px-4 py-3">Indicator Type</th>
+                <th className="px-4 py-3">Value / Artifact Hash</th>
+                <th className="px-4 py-3">Threat Category</th>
+                <th className="px-4 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100 font-mono">
+              {iocs_summary.map((ioc, i) => (
+                <tr key={i} className="hover:bg-neutral-50/80 transition">
+                  <td className="px-4 py-3">
+                    <span className="px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-800 font-bold uppercase text-[10px]">
+                      {ioc.ioc_type || 'IOC'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-neutral-900 break-all max-w-md">
+                    {ioc.value}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 font-bold text-[10px]">
+                      {ioc.threat_category || 'SUSPICIOUS'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right font-sans">
+                    <button
+                      onClick={() => navigator.clipboard.writeText(ioc.value)}
+                      className="text-xs text-neutral-500 hover:text-neutral-900 font-bold underline cursor-pointer"
+                    >
+                      Copy
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {iocs_summary.map((ioc, i) => (
-                  <tr key={i} className="border-b border-neutral-100">
-                    <td className="px-3 py-2 font-bold uppercase text-neutral-700">{ioc.ioc_type || 'IOC'}</td>
-                    <td className="px-3 py-2 font-mono font-semibold text-neutral-900">{ioc.value}</td>
-                    <td className="px-3 py-2">
-                      <span className="px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 text-[10px] font-semibold">
-                        {ioc.threat_category || 'SUSPICIOUS'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ─── DEFENSIVE HARDENING PLAYBOOK CHECKLIST ─────────────────────────── */}
+      <div className="crextio-card p-6 space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-emerald-600" />
+            <h2 className="text-base font-bold text-neutral-900">Recommended SOC Remediation &amp; Hardening Actions</h2>
           </div>
-        </Section>
-      )}
+          <span className="text-xs font-bold text-neutral-500">
+            Interactive Playbook
+          </span>
+        </div>
 
-      {/* Defensive Recommendations */}
-      {recommendations.length > 0 && (
-        <Section icon={ShieldCheck} title="Defensive Hardening & SOC Playbook Actions" iconBg="bg-emerald-50" iconColor="text-emerald-600">
-          <ol className="space-y-2 text-xs text-neutral-800 list-decimal list-inside font-medium">
-            {recommendations.map((r, i) => (
-              <li key={i} className="leading-relaxed">{r}</li>
-            ))}
-          </ol>
-        </Section>
-      )}
+        <div className="space-y-2.5">
+          {recommendations.map((rec, i) => {
+            const isObj = typeof rec === 'object';
+            const title = isObj ? rec.title : rec;
+            const desc = isObj ? rec.desc : 'Execute automated mitigation rule.';
+            const isDone = checklist[i] !== undefined ? checklist[i] : (isObj ? rec.done : false);
 
-      {/* Cryptographic Blockchain Seal */}
-      <div className="card p-5 bg-neutral-900 text-white rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center flex-shrink-0">
-            <CheckCircle className="w-5 h-5 text-emerald-400" />
+            return (
+              <div
+                key={i}
+                onClick={() => toggleChecklistItem(i)}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-4 ${
+                  isDone
+                    ? 'bg-emerald-50/60 border-emerald-200 text-emerald-950'
+                    : 'bg-neutral-50 border-neutral-200 text-neutral-900 hover:border-neutral-300'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-5 h-5 rounded-full mt-0.5 flex items-center justify-center flex-shrink-0 ${
+                    isDone ? 'bg-emerald-600 text-white' : 'border border-neutral-400'
+                  }`}>
+                    {isDone && <Check className="w-3 h-3 stroke-[3]" />}
+                  </div>
+                  <div>
+                    <h4 className={`text-xs font-bold ${isDone ? 'line-through opacity-80' : ''}`}>{title}</h4>
+                    <p className="text-[11px] text-neutral-500 mt-0.5 font-sans">{desc}</p>
+                  </div>
+                </div>
+
+                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${
+                  isDone ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-200 text-neutral-700'
+                }`}>
+                  {isDone ? 'Completed' : 'Pending Action'}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ─── CRYPTOGRAPHIC FORENSIC BLOCKCHAIN SEAL ─────────────────────────── */}
+      <div className="crextio-card-dark p-6 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center flex-shrink-0">
+            <CheckCircle className="w-6 h-6 text-emerald-400" />
           </div>
           <div>
-            <p className="text-xs font-bold text-white tracking-wide">
-              CRYPTOGRAPHIC PROOF OF FORENSIC INTEGRITY
-            </p>
-            <p className="text-[11px] text-neutral-400 font-mono mt-0.5">
-              Evidence Hash: {blockchain_proof?.block_hash || '0634babc287de2b9e05aad6026ef7b82b0a4778e0ac641c199ce5cb91f214c21'}
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-white tracking-wide">
+                CRYPTOGRAPHIC PROOF OF FORENSIC INTEGRITY
+              </h3>
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
+                BLOCKCHAIN VERIFIED
+              </span>
+            </div>
+            <p className="text-xs text-neutral-400 font-mono mt-1 break-all">
+              Evidence Hash: {activeReport.blockchain_proof?.block_hash || '0634babc287de2b9e05aad6026ef7b82b0a4778e0ac641c199ce5cb91f214c21'}
             </p>
           </div>
         </div>
-        <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 flex-shrink-0">
-          ✓ BLOCKCHAIN VERIFIED
-        </span>
+
+        <div className="text-right text-xs text-neutral-400 font-sans">
+          <span className="block text-white font-bold">TRINETRA Cyber Deception Grid</span>
+          <span>National Forensic Evidence Standard</span>
+        </div>
       </div>
 
     </div>

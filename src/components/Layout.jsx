@@ -3,7 +3,7 @@ import {
   Settings, Bell, Search, Play, Activity, Shield,
   Menu, X, Radio, ChevronRight, Check, User, Sliders,
   Volume2, VolumeX, RefreshCw, Lock, Sparkles, CheckCircle2,
-  Terminal, Zap
+  Terminal, Zap, Eye
 } from 'lucide-react';
 import { runAttackSimulation } from '../services/api';
 
@@ -23,12 +23,13 @@ export default function Layout({
   wsConnected,
   activeAttackCount,
   onOpenSandbox,
+  onOpenNotifications,
+  notificationCount = 0,
   children
 }) {
   const [simulating, setSimulating] = useState(false);
   const [simMsg, setSimMsg] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [notifications, setNotifications] = useState(activeAttackCount || 3);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -54,7 +55,6 @@ export default function Layout({
     try {
       await runAttackSimulation();
       setSimMsg('⚡ Attack campaign injected!');
-      setNotifications(prev => prev + 1);
     } catch (e) {
       setSimMsg(`⚠️ Error: ${e.message?.slice(0, 40) || 'check backend'}`);
     } finally {
@@ -77,7 +77,7 @@ export default function Layout({
           >
             <Shield className="w-4 h-4 text-neutral-900 fill-neutral-900" />
             <span className="font-sans text-base sm:text-lg font-extrabold tracking-tight text-neutral-900">
-              KURUKSHETRA
+              TRINETRA
             </span>
             <span className="text-[9px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-[#f8c858] text-neutral-900">
               SOC
@@ -120,14 +120,28 @@ export default function Layout({
           })}
         </nav>
 
-        {/* Right: Clean User Profile Avatar with Options Menu */}
+        {/* Right: Notification Trigger & Clean Profile Avatar Menu */}
         <div className="flex items-center gap-2.5 flex-shrink-0" ref={profileRef}>
+          {/* Quick Notification Bell Button */}
+          <button
+            onClick={() => {
+              if (onOpenNotifications) onOpenNotifications();
+            }}
+            className="w-10 h-10 rounded-full border border-neutral-300/80 bg-white/80 hover:bg-white text-neutral-700 hover:text-neutral-900 shadow-xs flex items-center justify-center transition cursor-pointer relative"
+            title="Open Security Alerts & Telemetry Notification Drawer"
+          >
+            <Bell className="w-4 h-4" />
+            {notificationCount > 0 && (
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white animate-pulse" />
+            )}
+          </button>
+
           <div className="relative">
             {/* User Profile Avatar */}
             <button
               onClick={() => setShowProfileMenu(!showProfileMenu)}
               className="w-10 h-10 rounded-full border-2 border-white ring-1 ring-neutral-300/80 bg-white overflow-hidden shadow-sm hover:ring-[#f8c858] hover:scale-105 transition-all flex-shrink-0 cursor-pointer relative"
-              title="Click for Attacker Sandbox, Simulate Attack & Settings"
+              title="Click for Attacker Sandbox, Simulation & Settings"
             >
               <img
                 src="/profile-avatar.jpg"
@@ -138,18 +152,14 @@ export default function Layout({
                   e.target.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80';
                 }}
               />
-              {/* Notification Indicator Dot */}
-              {notifications > 0 && (
-                <span className="absolute top-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white animate-pulse" />
-              )}
             </button>
 
             {/* Profile Dropdown Popup Menu */}
             {showProfileMenu && (
-              <div className="absolute right-0 mt-2.5 w-84 rounded-2xl bg-white/95 backdrop-blur-xl border border-neutral-200/90 shadow-2xl z-[150] p-3 text-neutral-800 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="absolute right-0 mt-2.5 w-96 rounded-3xl bg-white/95 backdrop-blur-xl border border-neutral-200 shadow-2xl z-[150] p-4 text-neutral-800 animate-in fade-in slide-in-from-top-2 duration-150">
                 {/* User Header */}
-                <div className="p-3 rounded-xl bg-neutral-50/80 border border-neutral-100 flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-full border border-neutral-300 overflow-hidden flex-shrink-0">
+                <div className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200/70 flex items-center gap-3.5 mb-3">
+                  <div className="w-11 h-11 rounded-full border border-neutral-300 overflow-hidden flex-shrink-0">
                     <img
                       src="/profile-avatar.jpg"
                       alt="User"
@@ -161,34 +171,34 @@ export default function Layout({
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-neutral-900 truncate">Senior SOC Analyst</p>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
-                        L3 Lead
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-bold text-neutral-900 truncate">Senior Cyber Defense Lead</p>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex-shrink-0">
+                        L3 Commander
                       </span>
                     </div>
-                    <p className="text-[11px] text-neutral-500 truncate">soc-operator@kurukshetra.sec</p>
+                    <p className="text-[11px] text-neutral-500 truncate font-mono">soc-lead@trinetra.gov.in</p>
                   </div>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   {/* 1. Interactive Attacker Sandbox Item */}
                   <button
                     onClick={() => {
                       if (onOpenSandbox) onOpenSandbox();
                       setShowProfileMenu(false);
                     }}
-                    className="w-full p-2.5 rounded-xl hover:bg-neutral-100/80 transition flex items-center gap-3 text-left group cursor-pointer"
+                    className="w-full p-2.5 rounded-2xl hover:bg-neutral-100 transition flex items-center gap-3 text-left group cursor-pointer"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-neutral-900 text-[#f8c858] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                    <div className="w-9 h-9 rounded-xl bg-neutral-900 text-[#f8c858] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
                       <Terminal className="w-4 h-4" />
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-neutral-900">Attacker Sandbox</span>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">LIVE</span>
+                        <span className="text-xs font-bold text-neutral-900">Interactive Sandbox Terminal</span>
+                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">LIVE</span>
                       </div>
-                      <p className="text-[11px] text-neutral-500">Interactive live honeypot terminal</p>
+                      <p className="text-[11px] text-neutral-500">Live honeypot session CLI emulator</p>
                     </div>
                   </button>
 
@@ -196,55 +206,49 @@ export default function Layout({
                   <button
                     onClick={handleSimulate}
                     disabled={simulating}
-                    className="w-full p-2.5 rounded-xl hover:bg-neutral-100/80 transition flex items-center gap-3 text-left group cursor-pointer disabled:opacity-50"
+                    className="w-full p-2.5 rounded-2xl hover:bg-neutral-100 transition flex items-center gap-3 text-left group cursor-pointer disabled:opacity-50"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                    <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
                       {simulating ? (
                         <Activity className="w-4 h-4 animate-spin text-amber-600" />
                       ) : (
                         <Play className="w-4 h-4 fill-amber-700 text-amber-700" />
                       )}
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-neutral-900">
-                          {simulating ? 'Injecting Attack...' : 'Simulate Attack Campaign'}
+                          {simulating ? 'Injecting Attack...' : 'Simulate Intrusion Campaign'}
                         </span>
                         {simMsg && (
                           <span className="text-[9px] text-amber-600 font-bold">{simMsg}</span>
                         )}
                       </div>
-                      <p className="text-[11px] text-neutral-500">Inject full multi-stage scenario</p>
+                      <p className="text-[11px] text-neutral-500">Inject full multi-stage honeypot scenario</p>
                     </div>
                   </button>
 
-                  {/* 3. Notifications Item */}
-                  <div className="w-full p-2.5 rounded-xl hover:bg-neutral-100/80 transition flex items-center gap-3 text-left">
-                    <div className="w-8 h-8 rounded-lg bg-neutral-100 border border-neutral-200 text-neutral-700 flex items-center justify-center flex-shrink-0">
+                  {/* 3. Notifications Drawer Item */}
+                  <button
+                    onClick={() => {
+                      if (onOpenNotifications) onOpenNotifications();
+                      setShowProfileMenu(false);
+                    }}
+                    className="w-full p-2.5 rounded-2xl hover:bg-neutral-100 transition flex items-center gap-3 text-left group cursor-pointer"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-neutral-100 border border-neutral-200 text-neutral-700 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
                       <Bell className="w-4 h-4" />
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-neutral-900">Notifications</span>
-                        {notifications > 0 ? (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setNotifications(0);
-                            }}
-                            className="text-[10px] text-neutral-500 hover:text-neutral-900 underline font-medium cursor-pointer"
-                          >
-                            Clear ({notifications})
-                          </button>
-                        ) : (
-                          <span className="text-[10px] text-emerald-600 font-semibold">All clear</span>
-                        )}
+                        <span className="text-xs font-bold text-neutral-900">Security Telemetry Alerts</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800">
+                          {notificationCount} Active
+                        </span>
                       </div>
-                      <p className="text-[11px] text-neutral-500">
-                        {notifications > 0 ? `${notifications} telemetry alerts captured` : 'No unread alerts'}
-                      </p>
+                      <p className="text-[11px] text-neutral-500">View real-time honeytrap trigger logs</p>
                     </div>
-                  </div>
+                  </button>
 
                   {/* 4. Settings Item */}
                   <button
@@ -252,25 +256,28 @@ export default function Layout({
                       setShowSettingsModal(true);
                       setShowProfileMenu(false);
                     }}
-                    className="w-full p-2.5 rounded-xl hover:bg-neutral-100/80 transition flex items-center gap-3 text-left group cursor-pointer"
+                    className="w-full p-2.5 rounded-2xl hover:bg-neutral-100 transition flex items-center gap-3 text-left group cursor-pointer"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-neutral-100 border border-neutral-200 text-neutral-700 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                    <div className="w-9 h-9 rounded-xl bg-neutral-100 border border-neutral-200 text-neutral-700 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
                       <Settings className="w-4 h-4" />
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-neutral-900">Platform Settings</span>
                         <ChevronRight className="w-3.5 h-3.5 text-neutral-400 group-hover:translate-x-0.5 transition" />
                       </div>
-                      <p className="text-[11px] text-neutral-500">Preferences &amp; audio alerts</p>
+                      <p className="text-[11px] text-neutral-500">Audio beeps, polling rate &amp; theme</p>
                     </div>
                   </button>
                 </div>
 
                 {/* Footer status strip */}
-                <div className="mt-2 pt-2 border-t border-neutral-100 flex items-center justify-between text-[10px] text-neutral-400 px-1">
-                  <span>Kurukshetra SOC Platform</span>
-                  <span className="text-emerald-600 font-medium">● Connected</span>
+                <div className="mt-3 pt-3 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-400 px-1 font-mono">
+                  <span>TRINETRA SOC PLATFORM</span>
+                  <span className="text-emerald-600 font-bold flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 blink" />
+                    Connected
+                  </span>
                 </div>
               </div>
             )}
@@ -290,7 +297,7 @@ export default function Layout({
                   setActiveTab(item.id);
                   setMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-2xl text-sm font-medium transition ${
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-2xl text-sm font-medium transition cursor-pointer ${
                   isActive ? 'bg-[#1e1e22] text-white' : 'text-neutral-700 hover:bg-neutral-100'
                 }`}
               >
@@ -314,7 +321,7 @@ export default function Layout({
             <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
               <div className="flex items-center gap-2.5">
                 <Sliders className="w-5 h-5 text-neutral-900" />
-                <h3 className="font-bold text-base text-neutral-900">Platform Preferences</h3>
+                <h3 className="font-bold text-base text-neutral-900">TRINETRA Platform Preferences</h3>
               </div>
               <button
                 onClick={() => setShowSettingsModal(false)}
@@ -325,7 +332,7 @@ export default function Layout({
             </div>
 
             <div className="space-y-4 py-5">
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-neutral-50 border border-neutral-100">
+              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-neutral-50 border border-neutral-100">
                 <div className="flex items-center gap-3">
                   {soundEnabled ? <Volume2 className="w-5 h-5 text-amber-600" /> : <VolumeX className="w-5 h-5 text-neutral-400" />}
                   <div>
@@ -347,7 +354,7 @@ export default function Layout({
                 </button>
               </div>
 
-              <div className="p-3 rounded-2xl bg-neutral-50 border border-neutral-100">
+              <div className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-100">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-neutral-900">Live Polling Rate</span>
                   <span className="text-xs font-mono font-bold text-neutral-700">{autoRefreshSecs}s</span>

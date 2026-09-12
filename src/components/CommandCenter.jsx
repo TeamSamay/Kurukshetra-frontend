@@ -30,7 +30,7 @@ function formatAttackTime(ts) {
   return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-export default function CommandCenter({ summaryData, attacks = [], loading: parentLoading, onSelectAttack, onContain }) {
+export default function CommandCenter({ summaryData, attacks = [], loading: parentLoading, onSelectAttack, onContain, onSelectIp }) {
   const [data, setData] = useState(summaryData || {});
   const [loading, setLoading] = useState(parentLoading ?? true);
   const [simulating, setSimulating] = useState(false);
@@ -680,7 +680,14 @@ export default function CommandCenter({ summaryData, attacks = [], loading: pare
                     filteredAttacks.map((atk, idx) => (
                       <tr key={atk.session_id || idx} className="hover:bg-neutral-50/80 transition">
                         <td className="px-4 py-3 font-mono font-bold text-neutral-900">
-                          {atk.source_ip || 'Unknown Attacker'}
+                          <button
+                            onClick={() => onSelectIp && onSelectIp(atk.source_ip)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1.5 cursor-pointer font-bold"
+                            title="Click for 360° Attacker Intelligence Dossier"
+                          >
+                            <span>{atk.source_ip || 'Unknown Attacker'}</span>
+                            <Eye className="w-3.5 h-3.5 opacity-70" />
+                          </button>
                         </td>
                         <td className="px-4 py-3">
                           <span className="px-2.5 py-0.5 rounded-full bg-neutral-100 text-neutral-800 font-bold text-[10px] uppercase">

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Zap, ArrowRight, Search, Lock, Filter, Clock, Terminal,
-  MapPin, Shield, ChevronDown, ChevronUp, Copy, Check
+  MapPin, Shield, ChevronDown, ChevronUp, Copy, Check, Eye
 } from 'lucide-react';
 
 function riskBadge(risk) {
@@ -37,14 +37,14 @@ function CopyBtn({ text }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <button onClick={copy} className="p-1.5 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition" title="Copy">
+    <button onClick={copy} className="p-1.5 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition cursor-pointer" title="Copy">
       {copied ? <Check className="w-3 h-3 text-emerald-600" />
                : <Copy className="w-3 h-3" />}
     </button>
   );
 }
 
-function AttackRow({ atk, onSelect, onContain }) {
+function AttackRow({ atk, onSelect, onContain, onSelectIp }) {
   const [expanded, setExpanded] = useState(false);
   const st = statusBadge(atk.status);
 
@@ -53,9 +53,14 @@ function AttackRow({ atk, onSelect, onContain }) {
       <tr className="hover:bg-neutral-50/70 transition-colors border-b border-neutral-100">
         <td className="px-5 py-3.5">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-xs font-semibold text-neutral-900">
-              {atk.source_ip || '?.?.?.?'}
-            </span>
+            <button
+              onClick={() => onSelectIp && onSelectIp(atk.source_ip)}
+              className="font-mono text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer"
+              title="Click for 360° Attacker Intelligence Dossier"
+            >
+              <span>{atk.source_ip || '?.?.?.?'}</span>
+              <Eye className="w-3 h-3 opacity-70" />
+            </button>
             <CopyBtn text={atk.source_ip || ''} />
           </div>
         </td>
@@ -121,7 +126,7 @@ function AttackRow({ atk, onSelect, onContain }) {
   );
 }
 
-export default function LiveAttacks({ attacks = [], onSelectAttack, onContain }) {
+export default function LiveAttacks({ attacks = [], onSelectAttack, onContain, onSelectIp }) {
   const [query, setQuery]         = useState('');
   const [filterRisk, setFilterRisk] = useState('ALL');
   const [filterSvc, setFilterSvc]   = useState('ALL');
@@ -205,7 +210,7 @@ export default function LiveAttacks({ attacks = [], onSelectAttack, onContain })
               </p>
               <p className="text-xs mt-1 text-neutral-400">
                 {attacks.length === 0
-                  ? 'Use "Simulate Attack" in the top bar to inject a live event'
+                  ? 'Use "Simulate Intrusion Campaign" in the top profile menu to inject a live event'
                   : 'Try adjusting your search query or filter pills'}
               </p>
             </div>
@@ -225,7 +230,7 @@ export default function LiveAttacks({ attacks = [], onSelectAttack, onContain })
               <tbody>
                 {filtered.map((atk, i) => (
                   <AttackRow key={atk.session_id || i} atk={atk}
-                    onSelect={onSelectAttack} onContain={onContain} />
+                    onSelect={onSelectAttack} onContain={onContain} onSelectIp={onSelectIp} />
                 ))}
               </tbody>
             </table>
