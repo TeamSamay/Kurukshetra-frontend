@@ -210,7 +210,7 @@ export default function LiveAttacks({ attacks = [], onSelectAttack, onContain, o
               </p>
               <p className="text-xs mt-1 text-neutral-400">
                 {attacks.length === 0
-                  ? 'Use "Simulate Intrusion Campaign" in the top profile menu to inject a live event'
+                  ? 'Listening for incoming honeypot events...'
                   : 'Try adjusting your search query or filter pills'}
               </p>
             </div>

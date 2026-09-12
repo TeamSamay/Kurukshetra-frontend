@@ -10,7 +10,7 @@ import {
   PieChart, Pie, Cell
 } from 'recharts';
 import {
-  fetchDashboardSummary, fetchAIThreatAnalysis, runAttackSimulation,
+  fetchDashboardSummary, fetchAIThreatAnalysis,
   fetchBlockchainSummary, triggerTamperDemo, restoreTamperDemo, fetchVulnerabilityGuard
 } from '../services/api';
 
@@ -33,8 +33,6 @@ function formatAttackTime(ts) {
 export default function CommandCenter({ summaryData, attacks = [], loading: parentLoading, onSelectAttack, onContain, onSelectIp }) {
   const [data, setData] = useState(summaryData || {});
   const [loading, setLoading] = useState(parentLoading ?? true);
-  const [simulating, setSimulating] = useState(false);
-  const [simFeedback, setSimFeedback] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
   const [activeTelemetryRange, setActiveTelemetryRange] = useState('24h');
   const [activeTabSection, setActiveTabSection] = useState('liveFeed');
@@ -151,23 +149,6 @@ export default function CommandCenter({ summaryData, attacks = [], loading: pare
       await loadBlockchainSummary();
     } catch (err) {
       setTamperFeedback(`Restore failed: ${err.message}`);
-    }
-  }
-
-  async function handleTriggerSimulation() {
-    if (simulating) return;
-    setSimulating(true);
-    setSimFeedback('');
-    try {
-      await runAttackSimulation();
-      setSimFeedback('✓ Live intrusion injected into honeypot!');
-    } catch {
-      setSimFeedback('⚡ Simulation event triggered');
-    } finally {
-      setTimeout(() => {
-        setSimulating(false);
-        setSimFeedback('');
-      }, 3500);
     }
   }
 
@@ -532,16 +513,6 @@ export default function CommandCenter({ summaryData, attacks = [], loading: pare
               </div>
             ))}
           </div>
-
-          {/* One-click Action button */}
-          <button
-            onClick={handleTriggerSimulation}
-            disabled={simulating}
-            className="w-full mt-3 py-2 px-3 rounded-full bg-neutral-900 hover:bg-black text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-          >
-            <Play className="w-3 h-3 fill-current text-[#f8c858]" />
-            <span>{simulating ? 'Injecting Attack Event…' : 'Trigger Live Attack Probe'}</span>
-          </button>
         </div>
 
         {/* ── CARD 4: AUTOMATED AI DEFENSE & MITIGATION PLAYBOOK ──────────── */}
@@ -739,7 +710,7 @@ export default function CommandCenter({ summaryData, attacks = [], loading: pare
                       <td colSpan={6} className="px-4 py-8 text-center text-neutral-400">
                         <Eye className="w-8 h-8 mx-auto mb-2 text-neutral-300" />
                         <p className="font-semibold text-neutral-700">No active honeypot infiltrations matching search filter</p>
-                        <p className="text-[11px] mt-1">Click "Trigger Live Attack Probe" above to simulate an attack.</p>
+                        <p className="text-[11px] mt-1 text-neutral-400">Listening on live telemetry feed...</p>
                       </td>
                     </tr>
                   )}

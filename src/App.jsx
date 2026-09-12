@@ -110,6 +110,8 @@ export default function App() {
   const [loading, setLoading]                 = useState(false);
   const [showSandbox, setShowSandbox]         = useState(false);
   const [selectedIntelIp, setSelectedIntelIp] = useState(null);
+  const [selectedReportSessionId, setSelectedReportSessionId] = useState(null);
+  const [selectedReportIp, setSelectedReportIp] = useState(null);
   const [showNotifications, setShowNotifications] = useState(false);
 
   const selectedIdRef = React.useRef(selectedId);
@@ -356,6 +358,12 @@ export default function App() {
     setActiveTab('investigation');
   }
 
+  function handleOpenReportForIp(ip, sessionId) {
+    setSelectedReportIp(ip);
+    if (sessionId) setSelectedReportSessionId(sessionId);
+    setActiveTab('report');
+  }
+
   async function handleContain(id) {
     try {
       await containSession(id);
@@ -377,7 +385,7 @@ export default function App() {
     dna:           <AttackerDNA attackers={attackers} />,
     ioc:           <IOCIntelligence iocList={iocList} onSelectIp={setSelectedIntelIp} />,
     mitre:         <MitreAttack mitreData={mitreData} />,
-    report:        <ThreatReport reportData={reportData} onContainSession={handleContain} attacks={attacks} onSelectIp={setSelectedIntelIp} />,
+    report:        <ThreatReport reportData={reportData} onContainSession={handleContain} attacks={attacks} onSelectIp={setSelectedIntelIp} selectedSessionId={selectedReportSessionId} selectedIp={selectedReportIp} />,
   };
 
   return (
@@ -399,7 +407,7 @@ export default function App() {
         />
       )}
 
-      {/* 360-Degree Attacker IP Intelligence Modal */}
+      {/* 360-Degree Attacker IP Intelligence & Report Modal */}
       {selectedIntelIp && (
         <AttackerIntelModal
           ip={selectedIntelIp}
@@ -407,6 +415,7 @@ export default function App() {
           attacks={attacks}
           onClose={() => setSelectedIntelIp(null)}
           onContain={handleContain}
+          onOpenReportTab={handleOpenReportForIp}
         />
       )}
 

@@ -5,7 +5,6 @@ import {
   Volume2, VolumeX, RefreshCw, Lock, Sparkles, CheckCircle2,
   Terminal, Zap, Eye
 } from 'lucide-react';
-import { runAttackSimulation } from '../services/api';
 
 export const NAV_ITEMS = [
   { id: 'command',       label: 'Dashboard',   desc: 'Overview & Operations' },
@@ -27,8 +26,6 @@ export default function Layout({
   notificationCount = 0,
   children
 }) {
-  const [simulating, setSimulating] = useState(false);
-  const [simMsg, setSimMsg] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -47,23 +44,6 @@ export default function Layout({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  async function handleSimulate() {
-    if (simulating) return;
-    setSimulating(true);
-    setSimMsg('');
-    try {
-      await runAttackSimulation();
-      setSimMsg('⚡ Attack campaign injected!');
-    } catch (e) {
-      setSimMsg(`⚠️ Error: ${e.message?.slice(0, 40) || 'check backend'}`);
-    } finally {
-      setTimeout(() => {
-        setSimulating(false);
-        setSimMsg('');
-      }, 3000);
-    }
-  }
 
   return (
     <div className="min-h-screen w-full flex flex-col selection:bg-[#f8c858] selection:text-neutral-900 bg-[#f6f6f2]">
@@ -202,31 +182,7 @@ export default function Layout({
                     </div>
                   </button>
 
-                  {/* 2. Simulate Attack One-Click Item */}
-                  <button
-                    onClick={handleSimulate}
-                    disabled={simulating}
-                    className="w-full p-2.5 rounded-2xl hover:bg-neutral-100 transition flex items-center gap-3 text-left group cursor-pointer disabled:opacity-50"
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
-                      {simulating ? (
-                        <Activity className="w-4 h-4 animate-spin text-amber-600" />
-                      ) : (
-                        <Play className="w-4 h-4 fill-amber-700 text-amber-700" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-neutral-900">
-                          {simulating ? 'Injecting Attack...' : 'Simulate Intrusion Campaign'}
-                        </span>
-                        {simMsg && (
-                          <span className="text-[9px] text-amber-600 font-bold">{simMsg}</span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-neutral-500">Inject full multi-stage honeypot scenario</p>
-                    </div>
-                  </button>
+
 
                   {/* 3. Notifications Drawer Item */}
                   <button

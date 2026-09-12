@@ -1,17 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileText, Shield, AlertTriangle, CheckCircle, Lock, Clock,
   Terminal, Target, TrendingUp, Download, ShieldCheck, XCircle,
   Printer, Cpu, Sparkles, Check, Share2, FileCode, ChevronDown,
   Activity, Globe, Server, Hash, Zap, CheckCircle2, ArrowRight,
   BarChart3, Eye, Layers, ShieldAlert, Filter, Search, Building2,
-  PieChart as PieIcon, ListFilter, SlidersHorizontal
+  PieChart as PieIcon, ListFilter, SlidersHorizontal, MapPin
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis,
   PolarRadiusAxis, Radar, PieChart, Pie, Cell
 } from 'recharts';
+import { buildComprehensiveThreatReport, getIpGeolocation } from '../services/threatIntel';
 import { exportSTIXBundle, downloadFile } from '../services/api';
 
 function formatTs(ts) {
@@ -40,181 +41,73 @@ const TOOLTIP_STYLE = {
   boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
 };
 
-// ── Synthetic Dynamic Report Builder for ANY Incident Session ────────────────
-function buildDynamicReportForSession(sessionId, attacks = []) {
-  const match = attacks.find(a => a.session_id === sessionId);
-  const ip = match?.source_ip || '185.220.101.5';
-  const svc = (match?.service || 'ssh').toLowerCase();
-  const rawScore = match?.risk_score;
-  const score = rawScore && rawScore > 0 ? rawScore : (svc === 'ssh' ? 95 : 88);
-  const riskLevel = match?.risk_level || (score >= 80 ? 'CRITICAL' : 'HIGH');
-  const status = match?.status || 'ACTIVE';
-
-  if (svc.includes('web') || svc.includes('http')) {
-    return {
-      report_id: `RPT-TRINETRA-WEB-${sessionId.slice(-6)}`,
-      session_id: sessionId,
-      source_ip: ip,
-      service: 'http',
-      risk_score: score,
-      risk_level: riskLevel,
-      containment_status: status,
-      generated_at: match?.last_seen || match?.timestamp || new Date().toISOString(),
-      threat_actor: 'FIN7 / Automated Web Exploit Kit',
-      campaign: 'Distributed Web & SQLi Infiltration Campaign',
-      target_env: 'HTTP Deception Honeypot (Port 8080)',
-      executive_summary: `Targeted web exploitation campaign identified on HTTP Deception grid from source ${ip}. Adversary executed automated directory fuzzing, probed decoy robots.txt, triggered canary honeytoken /passwords.txt, and injected SQL tautologies before sandbox containment.`,
-      attacker_objective: 'Exploit public-facing web application, retrieve database credentials, deploy PHP web shell backdoor, and establish pivot footholds.',
-      observed_behavior: [
-        `Automated crawler probed /robots.txt and accessed canary file /passwords.txt.`,
-        `Injected tautological SQL strings (' OR '1'='1' --) and UNION SELECT database queries.`,
-        `Attempted file upload targeting /uploads/backdoor.php via HTTP POST.`,
-        `Conducted automated port scans across virtual internal subnet.`
-      ],
-      ai_interpretation: [
-        'Command signature matches automated web exploit kit combined with human interactive verification.',
-        'Canary database credentials were fake, isolating potential production database compromise.',
-        'High probability of botnet reconnaissance preceding targeted ransomware staging.'
-      ],
-      kill_chain: [
-        { phase: 'Reconnaissance', event: 'Web directory enumeration & robots.txt probe', time: 'T+00s', status: 'TRAPPED' },
-        { phase: 'Exploitation', event: 'SQL Injection tautology bypass attempt', time: 'T+18s', status: 'TRAPPED' },
-        { phase: 'Persistence', event: 'Web shell file upload attempt to /uploads', time: 'T+34s', status: 'TRAPPED' },
-        { phase: 'Discovery', event: 'Subnet SYN sweep & internal API probing', time: 'T+50s', status: status === 'CONTAINED' ? 'CONTAINED' : 'TRAPPED' },
-      ],
-      radar_metrics: [
-        { subject: 'Initial Access', A: 95, fullMark: 100 },
-        { subject: 'Execution', A: 85, fullMark: 100 },
-        { subject: 'Persistence', A: 90, fullMark: 100 },
-        { subject: 'Privilege Esc', A: 60, fullMark: 100 },
-        { subject: 'Defense Evasion', A: 80, fullMark: 100 },
-        { subject: 'Exfiltration', A: 75, fullMark: 100 },
-      ],
-      mitre_techniques: [
-        { technique_id: 'T1190', technique_name: 'Exploit Public-Facing App', tactic: 'Initial Access', count: 12 },
-        { technique_id: 'T1552.001', technique_name: 'Credentials in Files', tactic: 'Credential Access', count: 2 },
-        { technique_id: 'T1505.003', technique_name: 'Web Shell', tactic: 'Persistence', count: 1 },
-        { technique_id: 'T1046', technique_name: 'Network Service Discovery', tactic: 'Discovery', count: 6 },
-      ],
-      iocs_summary: [
-        { ioc_type: 'ip', value: ip, threat_category: 'ATTACKER_SOURCE' },
-        { ioc_type: 'url', value: `http://${ip}/backdoor.php`, threat_category: 'PAYLOAD_DELIVERY' },
-        { ioc_type: 'file', value: '/var/www/html/passwords.txt', threat_category: 'HONEYTOKEN_CANARY' },
-        { ioc_type: 'hash_md5', value: '5d41402abc4b2a76b9719d911017c592', threat_category: 'MALWARE_HASH' },
-      ],
-      recommendations: [
-        { title: 'Deploy ModSecurity WAF Rule', desc: 'Block tautological SQL injection vectors at edge reverse proxy.', done: true },
-        { title: `Perimeter Firewall Ban`, desc: `Enforce instant DROP rule for ${ip} at border gateway.`, done: status === 'CONTAINED' },
-        { title: 'Rotate Decoy Database Passwords', desc: 'Regenerate canary credentials in web worker pool.', done: true },
-      ],
-      blockchain_proof: {
-        block_index: 48,
-        block_hash: '43c9218c68e21f2dfe6fb2b05fb9157687e744d79886faf9c7fc6bba1cd24352',
-        status: 'VERIFIED'
-      }
-    };
-  }
-
-  // SSH Honeypot
-  return {
-    report_id: `RPT-TRINETRA-SSH-${sessionId.slice(-6)}`,
-    session_id: sessionId,
-    source_ip: ip,
-    service: 'ssh',
-    risk_score: score,
-    risk_level: riskLevel,
-    containment_status: status,
-    generated_at: match?.last_seen || match?.timestamp || new Date().toISOString(),
-    threat_actor: 'APT29 (Cozy Bear Playbook)',
-    campaign: 'Cloud Metadata Theft & Decoy Infiltration',
-    target_env: 'SSH Deception Jumpbox (Port 2222)',
-    executive_summary: `Critical multi-stage intrusion captured on SSH Deception Grid from ${ip}. Adversary executed dictionary brute-force, triggered decoy canary honeytoken (/root/.env), probed AWS Cloud IMDS (169.254.169.254), and staged an external dropper binary before automated socket containment.`,
-    attacker_objective: 'Establish persistent C2 footprint, harvest AWS cloud IAM credentials, escalate privileges to root, and pivot into internal infrastructure.',
-    observed_behavior: [
-      `Targeted SSH authentication service with automated credential dictionary.`,
-      `Accessed decoy canary honeytoken file "/root/.env" containing synthetic AWS keys.`,
-      `Probed AWS Cloud Instance Metadata Service (169.254.169.254).`,
-      `Attempted to download external dropper payload from malicious C2 domain.`,
-      `Initiated interactive reverse shell targeting virtual TCP sandbox socket.`
-    ],
-    ai_interpretation: [
-      'Cadence and command signatures match advanced persistent threat (APT29 Cozy Bear) Linux tradecraft.',
-      'Attacker actively sought AWS Cloud credentials to pivot into the production cloud control plane.',
-      'All exfiltrated credentials were synthetically generated honeytokens.'
-    ],
-    kill_chain: [
-      { phase: 'Reconnaissance', event: 'Port 2222 probe & SSH banner identification', time: 'T+00s', status: 'TRAPPED' },
-      { phase: 'Initial Access', event: 'Credential dictionary authentication', time: 'T+14s', status: 'TRAPPED' },
-      { phase: 'Discovery', event: 'Cat canary /root/.env & uname -a kernel probe', time: 'T+28s', status: 'TRAPPED' },
-      { phase: 'Credential Access', event: 'AWS IMDS metadata endpoint probe', time: 'T+45s', status: 'TRAPPED' },
-      { phase: 'Command & Control', event: 'External dropper fetch & reverse shell', time: 'T+62s', status: status === 'CONTAINED' ? 'CONTAINED' : 'TRAPPED' },
-    ],
-    radar_metrics: [
-      { subject: 'Initial Access', A: 90, fullMark: 100 },
-      { subject: 'Execution', A: 85, fullMark: 100 },
-      { subject: 'Persistence', A: 70, fullMark: 100 },
-      { subject: 'Privilege Esc', A: 60, fullMark: 100 },
-      { subject: 'Defense Evasion', A: 95, fullMark: 100 },
-      { subject: 'Exfiltration', A: 80, fullMark: 100 },
-    ],
-    mitre_techniques: [
-      { technique_id: 'T1110.001', technique_name: 'Password Guessing', tactic: 'Credential Access', count: 18 },
-      { technique_id: 'T1078', technique_name: 'Valid Accounts', tactic: 'Initial Access', count: 2 },
-      { technique_id: 'T1552.001', technique_name: 'Credentials in Files', tactic: 'Credential Access', count: 1 },
-      { technique_id: 'T1552.005', technique_name: 'Cloud Instance Metadata API', tactic: 'Credential Access', count: 3 },
-      { technique_id: 'T1105', technique_name: 'Ingress Tool Transfer', tactic: 'Command & Control', count: 2 },
-      { technique_id: 'T1059.004', technique_name: 'Unix Shell Execution', tactic: 'Execution', count: 4 },
-    ],
-    iocs_summary: [
-      { ioc_type: 'ip', value: ip, threat_category: 'ATTACKER_C2' },
-      { ioc_type: 'url', value: 'http://cdn.malicious-domain.cc/tools/dropper.sh', threat_category: 'PAYLOAD_DELIVERY' },
-      { ioc_type: 'hash_sha256', value: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', threat_category: 'MALWARE_PAYLOAD' },
-      { ioc_type: 'file', value: '/root/.env', threat_category: 'HONEYTOKEN_CANARY' },
-    ],
-    recommendations: [
-      { title: 'Edge Firewall Drop Rule', desc: `Enforce perimeter DROP rule for IP ${ip} at edge gateway.`, done: status === 'CONTAINED' },
-      { title: 'DNS Sinkholing', desc: 'Sinkhole cdn.malicious-domain.cc across enterprise recursive DNS.', done: true },
-      { title: 'AWS CloudTrail Audit', desc: 'Verify synthetic canary IAM key ID AKIAIOSFODNN7EXAMPLE for cloud hits.', done: true },
-    ],
-    blockchain_proof: {
-      block_index: 42,
-      block_hash: '0634babc287de2b9e05aad6026ef7b82b0a4778e0ac641c199ce5cb91f214c21',
-      status: 'VERIFIED'
-    }
-  };
-}
-
-export default function ThreatReport({ reportData: rawReportData, onContainSession, attacks = [], onSelectIp }) {
+export default function ThreatReport({
+  reportData: rawReportData,
+  onContainSession,
+  attacks = [],
+  onSelectIp,
+  selectedSessionId: propSelectedSessionId,
+  selectedIp: propSelectedIp
+}) {
   const [reportMode, setReportMode] = useState('single'); // 'single' | 'fleet'
-  const [selectedSessionId, setSelectedSessionId] = useState('ATK-SSH-901');
+  const [selectedSessionId, setSelectedSessionId] = useState('');
   const [checklist, setChecklist] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSvc, setFilterSvc] = useState('ALL');
 
-  // Build full list of selectable incidents (presets + dynamic attacks)
-  const allIncidents = [
-    { session_id: 'ATK-SSH-901', source_ip: '185.220.101.5', service: 'ssh', risk_score: 95, risk_level: 'CRITICAL', label: 'APT29 Cozy Bear (SSH Canary Decoy)' },
-    { session_id: 'ATK-WEB-402', source_ip: '45.154.255.89', service: 'http', risk_score: 90, risk_level: 'CRITICAL', label: 'FIN7 Carbanak (Web SQLi & Shell)' },
-    ...attacks.filter(a => !['ATK-SSH-901', 'ATK-WEB-402'].includes(a.session_id)).map(a => ({
-      session_id: a.session_id,
-      source_ip: a.source_ip || '198.51.100.88',
-      service: a.service || 'ssh',
-      risk_score: a.risk_score || 85,
-      risk_level: a.risk_level || 'HIGH',
-      label: `${(a.service || 'SSH').toUpperCase()} Infiltration (${a.source_ip})`
-    }))
-  ];
+  // Build full list of all recorded incidents (dynamic live attacks + standard presets if empty)
+  const allIncidents = React.useMemo(() => {
+    if (attacks.length === 0) {
+      return [
+        { session_id: 'ATK-SSH-901', source_ip: '185.220.101.5', service: 'ssh', risk_score: 95, risk_level: 'CRITICAL', label: 'APT29 Cozy Bear (SSH Canary Decoy)' },
+        { session_id: 'ATK-WEB-402', source_ip: '45.154.255.89', service: 'http', risk_score: 90, risk_level: 'CRITICAL', label: 'FIN7 Carbanak (Web SQLi & Shell)' },
+        { session_id: 'ATK-SSH-103', source_ip: '103.208.220.12', service: 'ssh', risk_score: 74, risk_level: 'HIGH', label: 'Automated Port Scanner (India Vi Grid)' },
+      ];
+    }
 
-  // Dynamic report lookup based strictly on user selection
-  const activeReport = buildDynamicReportForSession(selectedSessionId, attacks);
+    return attacks.map(a => {
+      const geo = getIpGeolocation(a.source_ip);
+      const svc = (a.service || 'ssh').toUpperCase();
+      return {
+        session_id: a.session_id,
+        source_ip: a.source_ip || '198.51.100.88',
+        service: a.service || 'ssh',
+        risk_score: a.risk_score || (svc === 'SSH' ? 92 : 88),
+        risk_level: a.risk_level || 'HIGH',
+        status: a.status || 'ACTIVE',
+        last_seen: a.last_seen || a.timestamp || a.start_time,
+        geo,
+        label: `${svc} Infiltration (${a.source_ip}) · ${geo.country} ${geo.flag}`
+      };
+    });
+  }, [attacks]);
 
-  const session_id = activeReport.session_id || selectedSessionId;
-  const source_ip = activeReport.source_ip || '185.220.101.5';
+  // Sync selected incident when prop changes or on initial load
+  useEffect(() => {
+    if (propSelectedSessionId) {
+      setSelectedSessionId(propSelectedSessionId);
+    } else if (propSelectedIp) {
+      const match = allIncidents.find(i => i.source_ip === propSelectedIp);
+      if (match) setSelectedSessionId(match.session_id);
+    } else if (!selectedSessionId && allIncidents.length > 0) {
+      setSelectedSessionId(allIncidents[0].session_id);
+    }
+  }, [propSelectedSessionId, propSelectedIp, allIncidents, selectedSessionId]);
+
+  // Generate dynamic complete threat report for currently selected incident
+  const activeReport = React.useMemo(() => {
+    const targetId = selectedSessionId || (allIncidents[0]?.session_id) || 'ATK-SSH-901';
+    return buildComprehensiveThreatReport(targetId, attacks, rawReportData);
+  }, [selectedSessionId, attacks, rawReportData, allIncidents]);
+
+  const session_id = activeReport.session_id;
+  const source_ip = activeReport.source_ip;
   const service = (activeReport.service || 'ssh').toUpperCase();
   const risk_score = activeReport.risk_score || 95;
   const risk_level = activeReport.risk_level || 'CRITICAL';
   const containment_status = activeReport.containment_status || 'ACTIVE';
   const generated_at = activeReport.generated_at || new Date().toISOString();
+  const geo = activeReport.geo || getIpGeolocation(source_ip);
 
   const isContained = (containment_status || '').toUpperCase() === 'CONTAINED';
 
@@ -227,12 +120,12 @@ export default function ThreatReport({ reportData: rawReportData, onContainSessi
   const sshCount = allIncidents.filter(a => (a.service || '').toLowerCase() === 'ssh').length;
   const webCount = allIncidents.filter(a => ['http', 'web'].includes((a.service || '').toLowerCase())).length;
   const criticalCount = allIncidents.filter(a => (a.risk_level || '').toUpperCase() === 'CRITICAL' || a.risk_score >= 80).length;
-  const containedCount = attacks.filter(a => (a.status || '').toUpperCase() === 'CONTAINED').length;
+  const containedCount = allIncidents.filter(a => (a.status || '').toUpperCase() === 'CONTAINED').length;
 
   const fleetPieData = [
-    { name: 'SSH Decoy Traps', value: sshCount || 24, color: '#f8c858' },
-    { name: 'Web & API Decoy Traps', value: webCount || 20, color: '#1e1e22' },
-    { name: 'Port Probing Traps', value: Math.max(4, totalFleetAttacks - (sshCount + webCount)), color: '#0284c7' },
+    { name: 'SSH Decoy Traps', value: sshCount || (totalFleetAttacks > 0 ? totalFleetAttacks : 1), color: '#f8c858' },
+    { name: 'Web & API Decoy Traps', value: webCount || (totalFleetAttacks > 1 ? 1 : 0), color: '#1e1e22' },
+    { name: 'Port Probing Traps', value: Math.max(0, totalFleetAttacks - (sshCount + webCount)), color: '#0284c7' },
   ];
 
   const handleExportJSON = () => {
@@ -243,7 +136,8 @@ export default function ThreatReport({ reportData: rawReportData, onContainSessi
     const md = `# TRINETRA SOC EXECUTIVE THREAT INTELLIGENCE DOSSIER
 **Report ID**: ${activeReport.report_id}
 **Incident Session**: ${session_id}
-**Attacker IP**: ${source_ip}
+**Attacker IP**: ${source_ip} (${geo.city}, ${geo.country} ${geo.flag})
+**Origin ASN**: ${geo.asn}
 **Targeted Decoy**: ${service} Deception Node
 **Risk Score**: ${risk_score}/100 (${risk_level})
 **Containment Status**: ${containment_status}
@@ -270,7 +164,7 @@ ${(activeReport.mitre_techniques || []).map(m => `- [${m.technique_id}] ${m.tech
 ${(activeReport.iocs_summary || []).map(i => `- [${(i.ioc_type || 'IOC').toUpperCase()}] \`${i.value}\` (${i.threat_category})`).join('\n')}
 
 ---
-**Cryptographic Forensic Proof**: SHA-256 Block ${activeReport.blockchain_proof?.block_index || 42} (VERIFIED)
+**Cryptographic Forensic Proof**: SHA-256 Block ${activeReport.blockchain_proof?.block_index || 48} (VERIFIED)
 *Generated by TRINETRA Autonomous Cyber Deception Grid*
 `;
     downloadFile(`TRINETRA-incident-dossier-${session_id}.md`, md, 'text/markdown');
@@ -297,7 +191,7 @@ ${(activeReport.iocs_summary || []).map(i => `- [${(i.ioc_type || 'IOC').toUpper
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>Individual Incident Dossier</span>
+            <span>Individual Attacker IP / Incident Report</span>
           </button>
 
           <button
@@ -428,25 +322,23 @@ ${(activeReport.iocs_summary || []).map(i => `- [${(i.ioc_type || 'IOC').toUpper
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  { asn: 'AS200052 (Tor Exit Relays)', country: 'Germany 🇩🇪', hits: 18, threat: 'APT29 / Tor Anonymized' },
-                  { asn: 'AS48693 (Hostinger Cloud)', country: 'Russia 🇷🇺', hits: 14, threat: 'FIN7 / Web Exploit Kit' },
-                  { asn: 'AS133982 (Vodafone Idea)', country: 'India 🇮🇳', hits: 8, threat: 'Automated Port Scanner' },
-                  { asn: 'AS4134 (Chinanet Backbone)', country: 'China 🇨🇳', hits: 8, threat: 'SSH Credential Brute-force' },
-                ].map((item, i) => (
-                  <div key={i} className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200/80 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold text-neutral-900">{item.asn}</span>
-                      <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold">
-                        {item.hits} Hits
-                      </span>
+                {allIncidents.slice(0, 6).map((item, i) => {
+                  const g = item.geo || getIpGeolocation(item.source_ip);
+                  return (
+                    <div key={i} className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200/80 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs font-bold text-neutral-900 truncate max-w-[200px]">{g.asn}</span>
+                        <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold">
+                          {item.risk_score}/100 Risk
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-neutral-500">
+                        <span>{g.city}, {g.country} {g.flag}</span>
+                        <span className="text-purple-700 font-semibold font-mono">{item.source_ip}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-xs text-neutral-500">
-                      <span>{item.country}</span>
-                      <span className="text-purple-700 font-semibold">{item.threat}</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -455,8 +347,8 @@ ${(activeReport.iocs_summary || []).map(i => `- [${(i.ioc_type || 'IOC').toUpper
           <div className="crextio-card p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-neutral-100">
               <div>
-                <h3 className="text-base font-bold text-neutral-900">All Recorded Attack Incidents Register</h3>
-                <p className="text-xs text-neutral-500">Click any incident row to open its full individual forensic report</p>
+                <h3 className="text-base font-bold text-neutral-900">All Recorded Attacker IPs &amp; Incidents Register</h3>
+                <p className="text-xs text-neutral-500">Click any IP row to open its full individual forensic report</p>
               </div>
 
               {/* Filters */}
@@ -470,7 +362,7 @@ ${(activeReport.iocs_summary || []).map(i => `- [${(i.ioc_type || 'IOC').toUpper
                     className="bg-transparent focus:outline-none text-neutral-900 w-32"
                   />
                 </div>
-                {['ALL', 'SSH', 'WEB'].map(s => (
+                {['ALL', 'SSH', 'HTTP', 'WEB'].map(s => (
                   <button
                     key={s}
                     onClick={() => setFilterSvc(s)}
@@ -488,8 +380,8 @@ ${(activeReport.iocs_summary || []).map(i => `- [${(i.ioc_type || 'IOC').toUpper
               <table className="w-full text-left text-xs">
                 <thead className="bg-neutral-50 border-b border-neutral-100 text-neutral-500 font-semibold">
                   <tr>
-                    <th className="px-4 py-3">Incident Session Ref</th>
                     <th className="px-4 py-3">Attacker IP</th>
+                    <th className="px-4 py-3">Origin Geo / ASN</th>
                     <th className="px-4 py-3">Decoy Sensor</th>
                     <th className="px-4 py-3">Threat Score</th>
                     <th className="px-4 py-3">Campaign Profiling</th>
@@ -497,40 +389,43 @@ ${(activeReport.iocs_summary || []).map(i => `- [${(i.ioc_type || 'IOC').toUpper
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {filteredIncidents.map((inc, i) => (
-                    <tr
-                      key={inc.session_id || i}
-                      onClick={() => {
-                        setSelectedSessionId(inc.session_id);
-                        setReportMode('single');
-                      }}
-                      className="hover:bg-neutral-50/80 transition cursor-pointer group"
-                    >
-                      <td className="px-4 py-3 font-mono font-bold text-neutral-900">
-                        {inc.session_id}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-blue-600 font-bold">
-                        {inc.source_ip}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2.5 py-0.5 rounded-full bg-neutral-100 text-neutral-800 font-bold uppercase text-[10px]">
-                          {(inc.service || 'SSH').toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-bold text-rose-600">
-                        {inc.risk_score}/100
-                      </td>
-                      <td className="px-4 py-3 text-neutral-700">
-                        {inc.label}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="font-bold text-blue-600 group-hover:underline flex items-center justify-end gap-1">
-                          <span>Open Report</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredIncidents.map((inc, i) => {
+                    const g = inc.geo || getIpGeolocation(inc.source_ip);
+                    return (
+                      <tr
+                        key={inc.session_id || i}
+                        onClick={() => {
+                          setSelectedSessionId(inc.session_id);
+                          setReportMode('single');
+                        }}
+                        className="hover:bg-neutral-50/80 transition cursor-pointer group"
+                      >
+                        <td className="px-4 py-3 font-mono font-bold text-blue-600">
+                          {inc.source_ip}
+                        </td>
+                        <td className="px-4 py-3 font-sans text-neutral-700">
+                          {g.city}, {g.country} {g.flag}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="px-2.5 py-0.5 rounded-full bg-neutral-100 text-neutral-800 font-bold uppercase text-[10px]">
+                            {(inc.service || 'SSH').toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-bold text-rose-600">
+                          {inc.risk_score}/100
+                        </td>
+                        <td className="px-4 py-3 text-neutral-700">
+                          {inc.label}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="font-bold text-blue-600 group-hover:underline flex items-center justify-end gap-1">
+                            <span>Open IP Report</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -544,18 +439,21 @@ ${(activeReport.iocs_summary || []).map(i => `- [${(i.ioc_type || 'IOC').toUpper
           <div className="crextio-card p-4 flex flex-wrap items-center justify-between gap-3 bg-neutral-50 border border-neutral-200">
             <div className="flex items-center gap-3 flex-wrap flex-1 min-w-64">
               <span className="text-xs font-bold uppercase tracking-wider text-neutral-500 flex items-center gap-1.5">
-                <Target className="w-4 h-4 text-neutral-800" /> Active Incident:
+                <Target className="w-4 h-4 text-neutral-800" /> Select Attacker IP / Incident:
               </span>
               <select
                 value={selectedSessionId}
                 onChange={e => setSelectedSessionId(e.target.value)}
                 className="bg-white border border-neutral-300 rounded-full px-4 py-2 text-xs font-bold text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 font-mono shadow-xs cursor-pointer flex-1 max-w-xl"
               >
-                {allIncidents.map(inc => (
-                  <option key={inc.session_id} value={inc.session_id}>
-                    {inc.session_id} · {inc.source_ip} ({(inc.service).toUpperCase()} - {inc.risk_score} Risk) · {inc.label}
-                  </option>
-                ))}
+                {allIncidents.map(inc => {
+                  const g = inc.geo || getIpGeolocation(inc.source_ip);
+                  return (
+                    <option key={inc.session_id} value={inc.session_id}>
+                      {inc.source_ip} · {g.city}, {g.country} {g.flag} ({(inc.service).toUpperCase()} - {inc.risk_score} Risk)
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -594,24 +492,29 @@ ${(activeReport.iocs_summary || []).map(i => `- [${(i.ioc_type || 'IOC').toUpper
                 </div>
 
                 <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight font-sans">
-                  Executive Threat Intelligence Incident Report
+                  Executive Threat Intelligence Report: {source_ip}
                 </h1>
 
                 <div className="flex items-center gap-4 flex-wrap text-xs text-neutral-600 font-mono">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-neutral-400">Attacker:</span>
+                    <span className="text-neutral-400">Attacker IP:</span>
                     <button
                       onClick={() => onSelectIp && onSelectIp(source_ip)}
                       className="font-bold text-blue-600 hover:text-blue-800 underline flex items-center gap-1 cursor-pointer"
                       title="Click for 360° IP Intelligence Dossier"
                     >
                       <span>{source_ip}</span>
+                      <span>{geo.flag}</span>
                       <Eye className="w-3 h-3" />
                     </button>
                   </div>
                   <span>•</span>
                   <div>
-                    <span className="text-neutral-400">Ref:</span> <strong className="text-neutral-800">{activeReport.report_id}</strong>
+                    <span className="text-neutral-400">Location:</span> <strong className="text-neutral-800">{geo.city}, {geo.country}</strong>
+                  </div>
+                  <span>•</span>
+                  <div>
+                    <span className="text-neutral-400">ASN:</span> <strong className="text-neutral-800">{geo.asn}</strong>
                   </div>
                   <span>•</span>
                   <div className="flex items-center gap-1">
@@ -674,7 +577,7 @@ ${(activeReport.iocs_summary || []).map(i => `- [${(i.ioc_type || 'IOC').toUpper
                 {activeReport.threat_actor && (
                   <div className="p-3 rounded-xl bg-purple-50/70 border border-purple-100 flex items-center justify-between text-xs">
                     <span className="text-neutral-500">Attributed Actor / Campaign:</span>
-                    <strong className="text-purple-900 font-bold">{activeReport.threat_actor}</strong>
+                    <strong className="text-purple-900 font-bold">{activeReport.threat_actor} ({geo.actor_type})</strong>
                   </div>
                 )}
               </div>
@@ -925,7 +828,7 @@ ${(activeReport.iocs_summary || []).map(i => `- [${(i.ioc_type || 'IOC').toUpper
                   </span>
                 </div>
                 <p className="text-xs text-neutral-400 font-mono mt-1 break-all">
-                  Evidence Hash: {activeReport.blockchain_proof?.block_hash || '0634babc287de2b9e05aad6026ef7b82b0a4778e0ac641c199ce5cb91f214c21'}
+                  Evidence Hash: {activeReport.blockchain_proof?.block_hash || '43c9218c68e21f2dfe6fb2b05fb9157687e744d79886faf9c7fc6bba1cd24352'}
                 </p>
               </div>
             </div>
