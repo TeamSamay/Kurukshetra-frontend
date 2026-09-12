@@ -17,6 +17,16 @@ export function getIpGeolocation(ip) {
 
   // Pre-configured known signatures
   const known = {
+    '8.234.119.219': {
+      country: 'United States',
+      city: 'Ashburn, Virginia',
+      country_code: 'US',
+      flag: '🇺🇸',
+      asn: 'AS3356 (Level 3 / Cloud Threat Gateway)',
+      isp: 'Alibaba Cloud US Infrastructure',
+      threat_actor: 'Lazarus Group / APT41 Threat Grid',
+      actor_type: 'Nation-State / Advanced Persistent Threat',
+    },
     '152.58.32.48': {
       country: 'India',
       city: 'Mumbai, Maharashtra',
