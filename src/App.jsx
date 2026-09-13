@@ -121,8 +121,8 @@ export default function App() {
   // ── Toast helpers with rate-limiting ──────────────────────────────────────
   const addToast = useCallback((msg, title = 'SECURITY ALERT') => {
     const now = Date.now();
-    // Rate limit toasts to maximum 1 every 2.5s to avoid flood
-    if (now - lastToastTimeRef.current < 2500) {
+    // Rate limit toasts to maximum 1 every 5s to avoid spam
+    if (now - lastToastTimeRef.current < 5000) {
       return;
     }
     lastToastTimeRef.current = now;
@@ -141,7 +141,12 @@ export default function App() {
       osc.start();
       osc.stop(ctx.currentTime + 0.15);
     } catch {}
-    setToasts(prev => [...prev.slice(-2), { id: now, msg, title }]);
+    // Keep only 1 sleek active toast at a time
+    const toastId = now;
+    setToasts([{ id: toastId, msg, title }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== toastId));
+    }, 4000);
   }, []);
 
   const removeToast = useCallback((id) => {
